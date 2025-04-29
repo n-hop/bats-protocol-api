@@ -17,21 +17,25 @@
 #include "bats_protocol.h"
 
 int main(int argc, char* argv[]) {
-  if (argc != 3) {
-    std::cout << "Usage: " << argv[0] << " <cert_file> <key_file>" << std::endl;
+  if (argc > 4 || argc < 3) {
+    std::cout << "Usage: " << argv[0] << " <cert_file> <key_file> <mode>" << std::endl;
     return -1;
   }
   auto cert_file = argv[1];
   auto key_file = argv[2];
-  std::cout << "cert file: " << cert_file << ", key file: " << key_file << std::endl;
+  int mode = 0;
+  if (argc == 4) {
+    mode = std::stoi(argv[3]);
+  }
+  std::cout << "cert file: " << cert_file << ", key file: " << key_file << ", mode: " << mode << std::endl;
   int recv_cnt = 0;
   // connection callback which is used for observing the connection events.
   auto data_receive_callback = [&recv_cnt](const IBatsConnPtr& new_conn, const BatsConnEvent& event, const octet* data,
                                            int length, void* user) {
     switch (event) {
       case BatsConnEvent::BATS_CONNECTION_DATA_RECEIVED:
-        // std::cout << "[bats_server_example] Connection received " << length << " bytes, and each back " << recv_cnt++
-        //          << std::endl;
+        std::cout << "[bats_server_example] Connection received " << length << " bytes, and echo back " << recv_cnt++
+                  << std::endl;
         // new_conn->SendData(data, length);
         break;
       case BatsConnEvent::BATS_CONNECTION_SHUTDOWN_BY_PEER:
@@ -59,8 +63,9 @@ int main(int argc, char* argv[]) {
   };
 
   IOContext io;
+  io.SetBATSLogLevel(BATSLogLevel::TRACE);
   BatsConfiguration config;
-  config.SetMode(TransMode::BTP);  // default to BTP
+  config.SetMode(static_cast<TransMode>(mode));  // default to BTP
   config.SetCertFile(cert_file);
   config.SetKeyFile(key_file);
 
@@ -68,7 +73,7 @@ int main(int argc, char* argv[]) {
   protocol.LoadConfig(config);
 
   // BATS server start listening on port 12345
-  protocol.StartListen(12345, listener_callback);
+  protocol.StartListen("127.0.0.1", 12345, listener_callback);
 
   std::cout << "press any key to exit." << std::endl;
   getchar();

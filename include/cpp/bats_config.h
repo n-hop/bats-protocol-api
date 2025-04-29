@@ -45,25 +45,28 @@ enum FrameType : uint8_t {
 
 enum class BatsListenEvent : uint8_t {
   BATS_LISTEN_NONE = 0,
-  BATS_LISTEN_NEW_CONNECTION,  // new connection is accepted.
-  BATS_LISTEN_FAILED,          // failed to do listen.
-  BATS_LISTEN_ACCEPTED_ERROR,  // accepted connection error.
+  BATS_LISTEN_NEW_CONNECTION,     // new connection is accepted.
+  BATS_LISTEN_FAILED,             // failed to do listen.
+  BATS_LISTEN_SUCCESS,            // listen success.
+  BATS_LISTEN_ACCEPTED_ERROR,     // accepted connection error.
+  BATS_LISTEN_ALREADY_IN_LISTEN,  // already in listen state.
 };
 
 /// @brief IOContext will emit those events when the state of the connection changes. Within one BatsConnection,the
 /// callback is thread-safe.
 enum class BatsConnEvent : uint8_t {
   BATS_CONNECTION_NONE = 0,
-  BATS_CONNECTION_FAILED,            // conenction failed.
-  BATS_CONNECTION_ESTABLISHED,       // connection established.
-  BATS_CONNECTION_TIMEOUT,           // connection timeout in 2s.
-  BATS_CONNECTION_SHUTDOWN_BY_PEER,  // connection shutdown by peer.
-  BATS_CONNECTION_WRITABLE,          // connection writable, ready to send data.
-  BATS_CONNECTION_DATA_RECEIVED,     // connections has received data from peer.
-  BATS_CONNECTION_SEND_COMPLETE,     // connection sent last data complete.
-  BATS_CONNECTION_BUFFER_FULL,       // unable to write since the buffer of this connection is full.
-  BATS_CONNECTION_CLOSED,            // connection closed.
-  BATS_CONNECTION_ERROR,             // some errors in current connection
+  BATS_CONNECTION_FAILED,             // conenction failed.
+  BATS_CONNECTION_ESTABLISHED,        // connection established.
+  BATS_CONNECTION_TIMEOUT,            // connection timeout in 2s.
+  BATS_CONNECTION_SHUTDOWN_BY_PEER,   // connection shutdown by peer.
+  BATS_CONNECTION_WRITABLE,           // connection writable, ready to send data.
+  BATS_CONNECTION_DATA_RECEIVED,      // connections has received data from peer.
+  BATS_CONNECTION_SEND_COMPLETE,      // connection sent last data complete.
+  BATS_CONNECTION_BUFFER_FULL,        // unable to write since the buffer of this connection is full.
+  BATS_CONNECTION_CLOSED,             // connection closed.
+  BATS_CONNECTION_ERROR,              // some errors in current connection
+  BATS_CONNECTION_ALREADY_CONNECTED,  // connection already established.
 };
 
 class BatsConfigImpl;
@@ -84,6 +87,7 @@ class BatsConfiguration {
   /// @brief Set the TCP/UDP socket port which is used for listening or connecting.
   /// @param local_port The local port to be set.
   void SetLocalPort(int local_port);
+  void SetLocalAddress(const std::string& local_addr);
   /// @brief The certificate file and key file are used for TLS connection.
   /// @param cert_file
   void SetCertFile(const std::string& cert_file);

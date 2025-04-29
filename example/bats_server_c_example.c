@@ -9,9 +9,10 @@
  *
  */
 #include <stdio.h>
+#include <stdlib.h>
 
-#include "c_bats_api.h"
-#include "c_bats_types.h"
+#include "include/c/c_bats_api.h"
+#include "include/c/c_bats_types.h"
 
 void my_connection_callback(bats_connection_handle_t conn, bats_conn_event_t event, const unsigned char* data,
                             int length, void* user_data) {
@@ -63,17 +64,22 @@ void my_listener_callback(bats_connection_handle_t conn, bats_listen_event_t eve
 }
 
 int main(int argc, char* argv[]) {
-  if (argc != 3) {
-    printf("[bats_server_example] Invalid arguments; Usage: %s <cert_file> <key_file>\n", argv[0]);
+  if (argc > 4 || argc < 3) {
+    printf("[bats_server_example] Invalid arguments; Usage: %s <cert_file> <key_file> <mode>\n", argv[0]);
     return -1;
   }
   char* cert_file = argv[1];
   char* key_file = argv[2];
+  int mode = 0;
+  if (argc == 4) {
+    mode = atoi(argv[3]);
+  }
   bats_context_handle_t ctx = bats_context_create();
   if (!ctx) {
     printf("[bats_server_example] Failed to create BATS context\n");
     return -1;
   }
+  bats_context_set_log_level(ctx, bats_log_level_info);
 
   bats_config_handle_t config = bats_config_create();
   if (!config) {
@@ -83,7 +89,7 @@ int main(int argc, char* argv[]) {
   }
 
   // Set configuration parameters
-  bats_config_set_mode(config, 0);  // 11
+  bats_config_set_mode(config, mode);  // 11
   bats_config_set_local_port(config, 12345);
   bats_config_set_timeout(config, 2);
   bats_config_set_cc(config, bats_cc_gcc);
@@ -99,7 +105,7 @@ int main(int argc, char* argv[]) {
   }
 
   // Set up listener callback
-  bats_error_t err = bats_protocol_start_listen(protocol, 12345, my_listener_callback, NULL);
+  bats_error_t err = bats_protocol_start_listen(protocol, "127.0.0.1", 12345, my_listener_callback, NULL);
   if (err != bats_error_none) {
     printf("[bats_server_example] Failed to start listening: %d\n", err);
     bats_protocol_destroy(protocol);

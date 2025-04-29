@@ -12,9 +12,14 @@
 #ifndef INCLUDE_CPP_BATS_IOCONTEXT_H_
 #define INCLUDE_CPP_BATS_IOCONTEXT_H_
 
-class BatsProtocol;
 class IOContextImpl;
-
+enum class BATSLogLevel : int {
+  TRACE,
+  DEBUG,
+  INFO,
+  WARN,
+  ERROR,
+};
 /// @brief IO event processing instance in BATS protocol; each instance will create at least one thread to process IO
 /// events. IOContext can be shared by multiple protocol instances.
 class IOContext {
@@ -22,6 +27,9 @@ class IOContext {
   IOContext();
   virtual ~IOContext();
   IOContextImpl& GetImpl() const { return *impl_; }
+  /// @brief Set the log level for current process. The log level can be set to TRACE, DEBUG, INFO, WARN, or ERROR.
+  /// @param level
+  void SetBATSLogLevel(BATSLogLevel level);
 
  protected:
   IOContextImpl* impl_ = nullptr;

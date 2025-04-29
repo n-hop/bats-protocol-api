@@ -23,6 +23,14 @@ typedef struct bats_config_t* bats_config_handle_t;
 typedef struct bats_connection_t* bats_connection_handle_t;
 
 typedef enum {
+  bats_log_level_trace = 0,
+  bats_log_level_debug,
+  bats_log_level_info,
+  bats_log_level_warn,
+  bats_log_level_error,
+} bats_log_level_t;
+
+typedef enum {
   bats_error_none = 0,
   bats_error_invalid_param,
   bats_error_listen_failed,
@@ -60,23 +68,26 @@ typedef enum {
 /// callback is thread-safe.
 typedef enum {
   bats_connection_none = 0,
-  bats_connection_failed,            // conenction failed.
-  bats_connection_established,       // connection established.
-  bats_connection_timeout,           // connection timeout in 2s.
-  bats_connection_shutdown_by_peer,  // connection shutdown by peer.
-  bats_connection_writable,          // connection writable, ready to send data.
-  bats_connection_data_received,     // connections has received data from peer.
-  bats_connection_send_complete,     // connection sent last data complete.
-  bats_connection_buffer_full,       // unable to write since the buffer of this connection is full.
-  bats_connection_closed,            // connection closed.
-  bats_connection_error,             // some errors in current connection
+  bats_connection_failed,             // conenction failed.
+  bats_connection_established,        // connection established.
+  bats_connection_timeout,            // connection timeout in 2s.
+  bats_connection_shutdown_by_peer,   // connection shutdown by peer.
+  bats_connection_writable,           // connection writable, ready to send data.
+  bats_connection_data_received,      // connections has received data from peer.
+  bats_connection_send_complete,      // connection sent last data complete.
+  bats_connection_buffer_full,        // unable to write since the buffer of this connection is full.
+  bats_connection_closed,             // connection closed.
+  bats_connection_error,              // some errors in current connection
+  bats_connection_already_connected,  // connection already established.
 } bats_conn_event_t;
 
 typedef enum {
   bats_listen_none = 0,
   bats_listen_new_connection,
   bats_listen_failed,
-  bats_listen_accepted_error
+  bats_listen_success,  // listen success.
+  bats_listen_accepted_error,
+  bats_listen_already_in_listen,  // already in listen state.
 } bats_listen_event_t;
 
 typedef void (*bats_connection_callback_t)(bats_connection_handle_t conn, bats_conn_event_t event,

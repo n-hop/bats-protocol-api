@@ -19,7 +19,11 @@
 
 class MySender {
  public:
-  MySender(BatsProtocol& protocol, int send_cnt) : protocol_(protocol), send_cnt_(send_cnt) { send_data.resize(1200); }
+  MySender(BatsProtocol& protocol, int send_cnt) : protocol_(protocol), send_cnt_(send_cnt) {
+    send_data.resize(1200);
+    // init with 0x01
+    send_data.assign(1200, 0x01);
+  }
   ~MySender() = default;
   void MyConnectionCallback(const IBatsConnPtr& new_conn, const BatsConnEvent& event, const octet* data, int length,
                             void* user) {
@@ -89,7 +93,10 @@ class MySender {
         continue;
       }
       // std::cout << "[bats_client_example] send data: " << hello_str << " seq " << seq++ << std::endl;
-      my_bats_connection->SendData(reinterpret_cast<const octet*>(send_data.data()), send_data.size());
+      is_writable = my_bats_connection->SendData(reinterpret_cast<const octet*>(send_data.data()), send_data.size());
+      // if (is_writable == false) {
+      // // this send is not successful.
+      // }
       send_cnt_--;
     }
 
@@ -113,16 +120,19 @@ class MySender {
   IBatsConnPtr my_bats_connection = nullptr;
 };
 int main(int argc, char* argv[]) {
+  int mode = 0;
   int send_cnt = 0;
-  if (argc == 2) {
+  if (argc >= 2) {
     send_cnt = std::stoi(argv[1]);
-    std::cout << "[bats_client_example] send_cnt: " << send_cnt << std::endl;
   }
-
+  if (argc == 3) {
+    mode = std::stoi(argv[2]);
+  }
+  std::cout << "[bats_client_example] <send_cnt> <mode> " << send_cnt << "," << mode << std::endl;
   IOContext io;
   BatsConfiguration config;
-  config.SetMode(TransMode::BTP);  // default to BTP
-  config.SetTimeout(2000);         // 2000ms
+  config.SetMode(static_cast<TransMode>(mode));  // default to BTP
+  config.SetTimeout(2000);                       // 2000ms
   BatsProtocol protocol(io, config);
   MySender my_sender(protocol, send_cnt);
 

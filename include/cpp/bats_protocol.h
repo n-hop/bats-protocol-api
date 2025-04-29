@@ -42,10 +42,11 @@ class BatsProtocol {
   /// @param cb The callback function for connection events.
   void StartConnect(const ConnectionCallback& cb);
   /// @brief Start listening on the local port.
+  /// @param local_addr The local address to be bind and listen.
   /// @param local_port The local port to listen on.
   /// @param cb The callback function to receive listen events(failed/new connection). Don't block in the callback
   /// function.
-  void StartListen(uint16_t local_port, const ListenCallback& cb);
+  void StartListen(const std::string& local_addr, uint16_t local_port, const ListenCallback& cb);
   /// @brief Start listening on the local port which is set in the BatsConfiguration.
   /// @param cb The callback function to receive listen events(failed/new connection).
   void StartListen(const ListenCallback& cb);

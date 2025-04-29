@@ -21,12 +21,14 @@ extern "C" {
 // ================= Context ====================
 bats_context_handle_t bats_context_create();
 void bats_context_destroy(bats_context_handle_t ctx);
+void bats_context_set_log_level(bats_context_handle_t ctx, bats_log_level_t level);
 
 // ================= Config =====================
 bats_config_handle_t bats_config_create();
 void bats_config_destroy(bats_config_handle_t config);
 void bats_config_set_mode(bats_config_handle_t config, bats_transport_mode_t mode);
 void bats_config_set_timeout(bats_config_handle_t config, int timeout);
+void bats_config_set_local_addr(bats_config_handle_t config, const char* local_addr);
 void bats_config_set_local_port(bats_config_handle_t config, int local_port);
 void bats_config_set_remote_addr(bats_config_handle_t config, const char* remote_addr);
 void bats_config_set_remote_port(bats_config_handle_t config, int remote_port);
@@ -42,7 +44,7 @@ bats_protocol_handle_t bats_protocol_create(bats_context_handle_t ctx, bats_conf
 void bats_protocol_destroy(bats_protocol_handle_t protocol);
 bats_error_t bats_protocol_start_connect(bats_protocol_handle_t protocol, const char* remote_addr, uint16_t remote_port,
                                          bats_connection_callback_t c_callback, void* user_data);
-bats_error_t bats_protocol_start_listen(bats_protocol_handle_t protocol, uint16_t local_port,
+bats_error_t bats_protocol_start_listen(bats_protocol_handle_t protocol, const char* local_addr, uint16_t local_port,
                                         bats_listen_callback_t c_callback, void* user_data);
 
 // ================= Protocol Connection =====================
