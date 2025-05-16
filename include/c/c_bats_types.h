@@ -61,7 +61,7 @@ typedef enum {
   bats_frame_transparent = 0,  // no bats header
   bats_frame_header_min = 3,   // only has compatible header
   bats_frame_header_v1 = 2,    // has compatible header and coding header
-  bats_frame_header_v0 = 1,    // `bats_header_legacy`
+  bats_frame_header_v0 = 1,    // `bats_framework_header`
 } bats_frame_type_t;
 
 /// @brief IOContext will emit those events when the state of the connection changes. Within one BatsConnection,the

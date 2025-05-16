@@ -8,6 +8,8 @@
  * Copyright (c) 2025 The n-hop technologies Limited. All Rights Reserved.
  *
  */
+#include <signal.h>
+
 #include <cstring>
 #include <iostream>
 #include <thread>
@@ -16,6 +18,14 @@
 #include "bats_connection.h"
 #include "bats_iocontext.h"
 #include "bats_protocol.h"
+
+static int stop_signal_value(0);
+extern "C" {
+inline void SignalHandler(int sig) {
+  stop_signal_value = sig;
+  std::cout << "Received signal: " << sig << std::endl;
+}
+}
 
 class MySender {
  public:
@@ -128,6 +138,10 @@ int main(int argc, char* argv[]) {
   if (argc == 3) {
     mode = std::stoi(argv[2]);
   }
+  // ignore SIGPIPE
+  signal(SIGPIPE, SIG_IGN);
+  // The signals SIGKILL and SIGSTOP cannot be caught or ignored.
+  signal(SIGINT, SignalHandler);
   std::cout << "[bats_client_example] <send_cnt> <mode> " << send_cnt << "," << mode << std::endl;
   IOContext io;
   BatsConfiguration config;
@@ -138,6 +152,5 @@ int main(int argc, char* argv[]) {
 
   my_sender.StartConnect();
   my_sender.StartSend();
-
   return 0;
 }

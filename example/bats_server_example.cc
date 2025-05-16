@@ -8,13 +8,24 @@
  * Copyright (c) 2025 The n-hop technologies Limited. All Rights Reserved.
  *
  */
+#include <signal.h>
 
+#include <chrono>
 #include <cstring>
 #include <iostream>
+#include <thread>
 
 #include "bats_connection.h"
 #include "bats_iocontext.h"
 #include "bats_protocol.h"
+
+static int stop_signal_value(0);
+extern "C" {
+inline void SignalHandler(int sig) {
+  stop_signal_value = sig;
+  std::cout << "Received signal: " << sig << std::endl;
+}
+}
 
 int main(int argc, char* argv[]) {
   if (argc > 4 || argc < 3) {
@@ -34,8 +45,8 @@ int main(int argc, char* argv[]) {
                                            int length, void* user) {
     switch (event) {
       case BatsConnEvent::BATS_CONNECTION_DATA_RECEIVED:
-        std::cout << "[bats_server_example] Connection received " << length << " bytes, and echo back " << recv_cnt++
-                  << std::endl;
+        // std::cout << "[bats_server_example] Connection received " << length << " bytes, and echo back " << recv_cnt++
+        //          << std::endl;
         // new_conn->SendData(data, length);
         break;
       case BatsConnEvent::BATS_CONNECTION_SHUTDOWN_BY_PEER:
@@ -63,7 +74,7 @@ int main(int argc, char* argv[]) {
   };
 
   IOContext io;
-  io.SetBATSLogLevel(BATSLogLevel::TRACE);
+  io.SetBATSLogLevel(BATSLogLevel::INFO);
   BatsConfiguration config;
   config.SetMode(static_cast<TransMode>(mode));  // default to BTP
   config.SetCertFile(cert_file);
@@ -74,8 +85,13 @@ int main(int argc, char* argv[]) {
 
   // BATS server start listening on port 12345
   protocol.StartListen("127.0.0.1", 12345, listener_callback);
-
-  std::cout << "press any key to exit." << std::endl;
-  getchar();
+  std::cout << "Ctrl+C to exit." << std::endl;
+  // ignore SIGPIPE
+  signal(SIGPIPE, SIG_IGN);
+  // The signals SIGKILL and SIGSTOP cannot be caught or ignored.
+  signal(SIGINT, SignalHandler);
+  while (stop_signal_value != SIGINT) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+  }
   return 0;
 }

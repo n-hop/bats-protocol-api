@@ -40,7 +40,7 @@ enum FrameType : uint8_t {
   TRANSPARENT = 0,      // no bats header
   BATS_HEADER_MIN = 3,  // only has compatible header
   BATS_HEADER_V1 = 2,   // has compatible header and coding header
-  BATS_HEADER_V0 = 1,   // `bats_header_legacy`
+  BATS_HEADER_V0 = 1,   // `bats_framework_header`
 };
 
 enum class BatsListenEvent : uint8_t {
