@@ -49,9 +49,14 @@ class IBatsConnection {
   /// @param length The available length of the buffer.
   /// @return received bytes if success, -1 if failed, 0 means connection closed.
   virtual int RecvData(octet* data, int length) = 0;
+  /// @brief Switch receiving mode of current connection. Either disable the callback receiving or `RecvData` function
+  /// receiving depends on current mode.
+  virtual void SwitchDataRecvMode() = 0;
   /// @brief Indicate whether the connection is writable at current time.
   /// @return true if the connection is writable, false otherwise.
   virtual bool IsWritable() = 0;
+  /// @brief Close the connection.
+  virtual void Close() = 0;
 };
 
 #endif  // INCLUDE_CPP_BATS_CONNECTION_H_

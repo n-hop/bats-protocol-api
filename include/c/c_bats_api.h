@@ -22,6 +22,7 @@ extern "C" {
 bats_context_handle_t bats_context_create();
 void bats_context_destroy(bats_context_handle_t ctx);
 void bats_context_set_log_level(bats_context_handle_t ctx, bats_log_level_t level);
+void bats_context_get_signal_callback(bats_context_handle_t ctx, sig_callback_t c_callback);
 
 // ================= Config =====================
 bats_config_handle_t bats_config_create();
@@ -48,6 +49,7 @@ bats_error_t bats_protocol_start_listen(bats_protocol_handle_t protocol, const c
                                         bats_listen_callback_t c_callback, void* user_data);
 
 // ================= Protocol Connection =====================
+void bats_connection_close(bats_connection_handle_t conn);
 bats_error_t bats_connection_send_data(bats_connection_handle_t conn, const unsigned char* data, int length);
 bats_error_t bats_connection_send_file(bats_connection_handle_t conn, const char* file_name);
 void bats_connection_set_callback(bats_connection_handle_t conn, bats_connection_callback_t c_callback,
