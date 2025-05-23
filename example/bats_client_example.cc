@@ -8,8 +8,7 @@
  * Copyright (c) 2025 The n-hop technologies Limited. All Rights Reserved.
  *
  */
-#include <signal.h>
-
+#include <csignal>
 #include <cstring>
 #include <iostream>
 #include <thread>
@@ -20,28 +19,33 @@
 #include "bats_protocol.h"
 
 static int stop_signal_value(0);
-extern "C" {
-inline void SignalHandler(int sig) {
-  stop_signal_value = sig;
-  std::cout << "Received signal: " << sig << std::endl;
-}
-}
 
 class MySender {
  public:
-  MySender(BatsProtocol& protocol, int send_cnt) : protocol_(protocol), send_cnt_(send_cnt) {
-    send_data.resize(1200);
+  MySender(BatsProtocol& protocol, int send_cnt, TransMode mode)
+      : protocol_(protocol), send_cnt_(send_cnt), my_mode_(mode) {
+    int ideal_length = 1200;
+    if (my_mode_ == TransMode::BTP) {
+      ideal_length = 30000;
+    }
+    send_data.resize(ideal_length);
     // init with 0x01
-    send_data.assign(1200, 0x01);
+    send_data.assign(ideal_length, 0x01);
   }
   ~MySender() = default;
   void MyConnectionCallback(const IBatsConnPtr& new_conn, const BatsConnEvent& event, const octet* data, int length,
                             void* user) {
     switch (event) {
       case BatsConnEvent::BATS_CONNECTION_FAILED:
-      case BatsConnEvent::BATS_CONNECTION_CLOSED:
-      case BatsConnEvent::BATS_CONNECTION_SHUTDOWN_BY_PEER:
         std::cout << "[bats_client_example] Connection failed." << std::endl;
+        is_connect_failed = true;
+        break;
+      case BatsConnEvent::BATS_CONNECTION_CLOSED:
+        std::cout << "[bats_client_example] Connection closed." << std::endl;
+        is_connected = false;
+        break;
+      case BatsConnEvent::BATS_CONNECTION_SHUTDOWN_BY_PEER:
+        std::cout << "[bats_client_example] Connection shutdown by peer." << std::endl;
         is_connected = false;
         is_connect_failed = true;
         break;
@@ -76,20 +80,21 @@ class MySender {
   }
 
   void StartSend() {
-    while (is_connected == false) {
+    while (is_connected == false && stop_signal_value != SIGINT) {
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
       if (is_connect_failed) {
-        timeout_cnt_++;
         if (timeout_cnt_ >= max_timeout_cnt_) {
           // simple timeout reconnect
           timeout_cnt_ = 0;
           is_connect_failed = false;
           using namespace std::placeholders;
+          std::cout << "[bats_client_example] Reconnect to server..." << std::endl;
           protocol_.StartConnect("127.0.0.1", 12345,
                                  std::bind(&MySender::MyConnectionCallback, this, _1, _2, _3, _4, _5));
-          std::cout << "[bats_client_example] Reconnect to server..." << std::endl;
+          std::cout << "[bats_client_example] StartConnect returned..." << std::endl;
         }
       }
+      timeout_cnt_++;
     }
     std::cout << "[bats_client_example] connection is ready, start sending data." << std::endl;
     if (send_cnt_ == 0) {
@@ -97,7 +102,7 @@ class MySender {
     }
     std::cout << "[bats_client_example] send_cnt: " << send_cnt_ << std::endl;
     // int seq = 0;
-    while (is_connected && send_cnt_ != 0) {
+    while (is_connected && send_cnt_ != 0 && stop_signal_value != SIGINT) {
       if (is_writable == false) {
         std::this_thread::yield();
         continue;
@@ -128,6 +133,7 @@ class MySender {
   bool is_connected = {false};
   bool is_writable = {false};
   IBatsConnPtr my_bats_connection = nullptr;
+  TransMode my_mode_ = TransMode::BTP;
 };
 int main(int argc, char* argv[]) {
   int mode = 0;
@@ -138,19 +144,19 @@ int main(int argc, char* argv[]) {
   if (argc == 3) {
     mode = std::stoi(argv[2]);
   }
-  // ignore SIGPIPE
-  signal(SIGPIPE, SIG_IGN);
-  // The signals SIGKILL and SIGSTOP cannot be caught or ignored.
-  signal(SIGINT, SignalHandler);
   std::cout << "[bats_client_example] <send_cnt> <mode> " << send_cnt << "," << mode << std::endl;
   IOContext io;
+  io.SetSignalCallback([](int sig) { stop_signal_value = sig; });
   BatsConfiguration config;
   config.SetMode(static_cast<TransMode>(mode));  // default to BTP
   config.SetTimeout(2000);                       // 2000ms
   BatsProtocol protocol(io, config);
-  MySender my_sender(protocol, send_cnt);
+  MySender my_sender(protocol, send_cnt, static_cast<TransMode>(mode));
 
   my_sender.StartConnect();
   my_sender.StartSend();
+
+  // wait for receiving echo back data otherwise the remote side can't send data back.
+  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
   return 0;
 }

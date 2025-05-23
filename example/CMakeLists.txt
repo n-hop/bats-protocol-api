@@ -1,6 +1,9 @@
 add_executable(bats_server_example bats_server_example.cc)
 target_link_libraries(bats_server_example PRIVATE bats::protocol)
 
+add_executable(bats_server_example2 bats_server_example2.cc)
+target_link_libraries(bats_server_example2 PRIVATE bats::protocol)
+
 add_executable(bats_server_c_example bats_server_c_example.c)
 target_link_libraries(bats_server_c_example PRIVATE bats::protocol)
 

@@ -8,11 +8,19 @@
  * Copyright (c) 2025 The n-hop technologies Limited. All Rights Reserved.
  *
  */
+#include <signal.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include "include/c/c_bats_api.h"
 #include "include/c/c_bats_types.h"
+
+static int stop_signal_value = 0;
+static bool is_stopped = false;
+
+void signal_handler(int signum) { stop_signal_value = signum; }
 
 void my_connection_callback(bats_connection_handle_t conn, bats_conn_event_t event, const unsigned char* data,
                             int length, void* user_data) {
@@ -22,7 +30,9 @@ void my_connection_callback(bats_connection_handle_t conn, bats_conn_event_t eve
       printf("[bats_server_example] Connection established\n");
       break;
     case bats_connection_data_received:
-      printf("[bats_server_example] Data received: %s %d\n", data, recv_cnt++);
+      printf("[bats_server_example] Data received: len %d SEQ %d\n", length, recv_cnt++);
+      bats_connection_send_data(conn, data, length);
+      bats_connection_close(conn);
       break;
     case bats_connection_writable:
       printf("[bats_server_example] Connection writable\n");
@@ -35,12 +45,14 @@ void my_connection_callback(bats_connection_handle_t conn, bats_conn_event_t eve
       break;
     case bats_connection_shutdown_by_peer:
       printf("[bats_server_example] Connection shutdown by peer\n");
+      is_stopped = true;
       break;
     case bats_connection_closed:
       printf("[bats_server_example] Connection closed\n");
+      is_stopped = true;
       break;
     default:
-      printf("[bats_server_example] Unknown event\n");
+      printf("[bats_server_example] Unknown connection event %d\n", (int)event);
       break;
   }
 }
@@ -57,8 +69,11 @@ void my_listener_callback(bats_connection_handle_t conn, bats_listen_event_t eve
     case bats_listen_accepted_error:
       printf("[bats_server_example] Failed to accept connection\n");
       break;
+    case bats_listen_success:
+      printf("[bats_server_example] Listening successfully\n");
+      break;
     default:
-      printf("[bats_server_example] Unknown event\n");
+      printf("[bats_server_example] Unknown listen event %d\n", (int)event);
       break;
   }
 }
@@ -80,6 +95,7 @@ int main(int argc, char* argv[]) {
     return -1;
   }
   bats_context_set_log_level(ctx, bats_log_level_info);
+  bats_context_get_signal_callback(ctx, signal_handler);
 
   bats_config_handle_t config = bats_config_create();
   if (!config) {
@@ -115,7 +131,12 @@ int main(int argc, char* argv[]) {
   }
 
   printf("Listening on port 12345...\n");
-  getchar();  // Wait for user input to exit
+  printf("Ctrl+C to exit.\n");
+  while (stop_signal_value != SIGINT && is_stopped == false) {
+    sleep(1);
+  }
+  printf("exiting...\n");
+  // bats_context_get_signal_callback
 
   // Clean up
   bats_protocol_destroy(protocol);
