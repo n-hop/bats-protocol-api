@@ -52,7 +52,7 @@ int main(int argc, char* argv[]) {
         std::cout << "[bats_server_example] Connection established." << std::endl;
         // set connection callback for receiving data.
         accepted_conn = new_conn;
-        accepted_conn->SetConnectionCallback(connection_callback);
+        accepted_conn->SetConnectionCallback(connection_callback, nullptr);
         break;
       case BatsListenEvent::BATS_LISTEN_FAILED:
         std::cout << "[bats_server_example] Failed to listen." << std::endl;
@@ -75,7 +75,7 @@ int main(int argc, char* argv[]) {
   protocol.LoadConfig(config);
 
   // BATS server start listening on port 12345
-  protocol.StartListen("127.0.0.1", 12345, listener_callback);
+  protocol.StartListen("127.0.0.1", 12345, listener_callback, nullptr);
   std::cout << "Ctrl+C to exit." << std::endl;
 
   int recv_cnt = 0;

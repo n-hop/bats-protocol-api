@@ -44,16 +44,15 @@ void bats_config_set_frame_type(bats_config_handle_t config, bats_frame_type_t f
 bats_protocol_handle_t bats_protocol_create(bats_context_handle_t ctx, bats_config_handle_t config);
 void bats_protocol_destroy(bats_protocol_handle_t protocol);
 bats_error_t bats_protocol_start_connect(bats_protocol_handle_t protocol, const char* remote_addr, uint16_t remote_port,
-                                         bats_connection_callback_t c_callback, void* user_data);
+                                         bats_connection_callback_t c_callback, void* context);
 bats_error_t bats_protocol_start_listen(bats_protocol_handle_t protocol, const char* local_addr, uint16_t local_port,
-                                        bats_listen_callback_t c_callback, void* user_data);
+                                        bats_listen_callback_t c_callback, void* context);
 
 // ================= Protocol Connection =====================
 void bats_connection_close(bats_connection_handle_t conn);
 bats_error_t bats_connection_send_data(bats_connection_handle_t conn, const unsigned char* data, int length);
 bats_error_t bats_connection_send_file(bats_connection_handle_t conn, const char* file_name);
-void bats_connection_set_callback(bats_connection_handle_t conn, bats_connection_callback_t c_callback,
-                                  void* user_data);
+void bats_connection_set_callback(bats_connection_handle_t conn, bats_connection_callback_t c_callback, void* context);
 int bats_connection_recv_data(bats_connection_handle_t conn, unsigned char* data, int max_length);
 int bats_connection_is_writable(bats_connection_handle_t conn);
 

@@ -20,6 +20,7 @@
 
 static int stop_signal_value(0);
 static bool is_stopped = false;
+void* user_context = &stop_signal_value;
 
 int main(int argc, char* argv[]) {
   if (argc > 4 || argc < 3) {
@@ -41,6 +42,7 @@ int main(int argc, char* argv[]) {
       case BatsConnEvent::BATS_CONNECTION_DATA_RECEIVED:
         // std::cout << "[bats_server_example] Connection received " << length << " bytes, and echo back " << recv_cnt++
         //          << std::endl;
+        // Not recommended to send data in the callback, since it may block the IO thread or SendData may fail.
         // new_conn->SendData(data, length);
         // new_conn->Close();
         break;
@@ -57,12 +59,19 @@ int main(int argc, char* argv[]) {
   // listener callback which is used for observing the listener events.
   auto listener_callback = [&recv_cnt, &data_receive_callback](const IBatsConnPtr& new_conn,
                                                                const BatsListenEvent& event, void* user) {
+    if (user != user_context) {
+      std::cout << "[bats_server_example] User context is not matched." << std::endl;
+      is_stopped = true;
+    } else {
+      int* sig = reinterpret_cast<int*>(user);
+      std::cout << "[bats_server_example] User context value " << *sig << std::endl;
+    }
     switch (event) {
       case BatsListenEvent::BATS_LISTEN_NEW_CONNECTION:
         // accepted new connection on `new_conn`
         std::cout << "[bats_server_example] Connection established." << std::endl;
         // set connection callback for receiving data.
-        new_conn->SetConnectionCallback(data_receive_callback);
+        new_conn->SetConnectionCallback(data_receive_callback, user_context);
         break;
       case BatsListenEvent::BATS_LISTEN_FAILED:
         std::cout << "[bats_server_example] Failed to listen." << std::endl;
@@ -84,7 +93,7 @@ int main(int argc, char* argv[]) {
   protocol.LoadConfig(config);
 
   // BATS server start listening on port 12345
-  protocol.StartListen("127.0.0.1", 12345, listener_callback);
+  protocol.StartListen("127.0.0.1", 12345, listener_callback, user_context);
   std::cout << "Ctrl+C to exit." << std::endl;
   while (stop_signal_value != SIGINT && is_stopped == false) {
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));

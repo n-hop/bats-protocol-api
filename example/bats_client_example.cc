@@ -25,7 +25,7 @@ class MySender {
   MySender(BatsProtocol& protocol, int send_cnt, TransMode mode)
       : protocol_(protocol), send_cnt_(send_cnt), my_mode_(mode) {
     int ideal_length = 1200;
-    if (my_mode_ == TransMode::BTP) {
+    if (my_mode_ == TransMode::BTP || my_mode_ == TransMode::BRTP) {
       ideal_length = 30000;
     }
     send_data.resize(ideal_length);
@@ -55,7 +55,8 @@ class MySender {
         is_connected = true;
         break;
       case BatsConnEvent::BATS_CONNECTION_DATA_RECEIVED:
-        std::cout << "[bats_client_example] Connection received " << length << " bytes" << std::endl;
+        std::cout << "[bats_client_example] Connection received " << length << " bytes"
+                  << " " << recv_cnt_++ << std::endl;
         break;
       case BatsConnEvent::BATS_CONNECTION_BUFFER_FULL:
         is_writable = false;
@@ -76,7 +77,8 @@ class MySender {
   void StartConnect() {
     std::cout << "[bats_client_example] Start connect to server..." << std::endl;
     using namespace std::placeholders;
-    protocol_.StartConnect("127.0.0.1", 12345, std::bind(&MySender::MyConnectionCallback, this, _1, _2, _3, _4, _5));
+    protocol_.StartConnect("127.0.0.1", 12345, std::bind(&MySender::MyConnectionCallback, this, _1, _2, _3, _4, _5),
+                           nullptr);
   }
 
   void StartSend() {
@@ -90,7 +92,7 @@ class MySender {
           using namespace std::placeholders;
           std::cout << "[bats_client_example] Reconnect to server..." << std::endl;
           protocol_.StartConnect("127.0.0.1", 12345,
-                                 std::bind(&MySender::MyConnectionCallback, this, _1, _2, _3, _4, _5));
+                                 std::bind(&MySender::MyConnectionCallback, this, _1, _2, _3, _4, _5), nullptr);
           std::cout << "[bats_client_example] StartConnect returned..." << std::endl;
         }
       }
@@ -101,32 +103,31 @@ class MySender {
       send_cnt_ = std::numeric_limits<uint64_t>::max();
     }
     std::cout << "[bats_client_example] send_cnt: " << send_cnt_ << std::endl;
-    // int seq = 0;
     while (is_connected && send_cnt_ != 0 && stop_signal_value != SIGINT) {
       if (is_writable == false) {
         std::this_thread::yield();
         continue;
       }
-      // std::cout << "[bats_client_example] send data: " << hello_str << " seq " << seq++ << std::endl;
       is_writable = my_bats_connection->SendData(reinterpret_cast<const octet*>(send_data.data()), send_data.size());
-      // if (is_writable == false) {
-      // // this send is not successful.
-      // }
+      if (is_writable == false) {
+        // not a successful sending.
+        continue;
+      }
       send_cnt_--;
     }
 
     if (is_connected == false) {
       std::cout << "[bats_client_example] Connection closed, stop send. " << send_cnt_ << std::endl;
     } else {
-      std::cout << "[bats_client_example] Sending data is finished." << std::endl;
+      std::cout << "[bats_client_example] Sending data is finished. " << send_cnt_ << std::endl;
     }
   }
 
  private:
   BatsProtocol& protocol_;
-  const std::string hello_str = "Hello world!";
   octetVec send_data;
   uint64_t send_cnt_ = 10;
+  uint64_t recv_cnt_ = 0;
   uint32_t timeout_cnt_ = 0;
   uint32_t max_timeout_cnt_ = 30;  // 100ms * 30
   bool is_connect_failed = {false};

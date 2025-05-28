@@ -28,8 +28,9 @@ class IBatsConnection {
   virtual ~IBatsConnection() = default;
   /// @brief Set the callback function to receive the connection events(read/write/close).
   /// @param cb The callback function. Don't block in the callback function.
-  virtual void SetConnectionCallback(const ConnectionCallback& cb) = 0;
-  virtual void SetConnectionCallback(ConnectionCallback&& cb) = 0;
+  /// @param context The user context to be passed to the callback function.
+  virtual void SetConnectionCallback(const ConnectionCallback& cb, void* context) = 0;
+  virtual void SetConnectionCallback(ConnectionCallback&& cb, void* context) = 0;
   /// @brief Interface for sending data to the network.
   /// @param data The data to be sent.
   /// @return true if the data is sent successfully, false otherwise. Sending failure can be caused by the following
