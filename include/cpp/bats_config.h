@@ -22,14 +22,14 @@ using octVecIter = std::vector<octet>::iterator;
 using octVecConstIter = std::vector<octet>::const_iterator;
 
 enum class TransMode : uint8_t {
-  BTP = 0,          // Not implemented.
-  BRTP = 1,         // Not implemented.
-  BRCTP = 2,        // Not implemented.
+  BTP = 0,          // Unreliable BATS Transport Protocol (with cc)
+  BRTP = 1,         // BATS Reliable Transport Protocol (with cc)
+  BRCTP = 2,        // Not implemented. BATS Rateless-coding Transport Protocol (with cc)
   TRANSPARENT = 3,  // udp, no fec, no cc.
 };
 
 enum class CongestionControl : uint8_t {
-  None = 0,   // No congestion control.
+  None = 0,   // congestion control disabled.
   BBR = 1,    // BBR congestion control.
   BBRv2 = 3,  // Not implemented.
   BBRv3 = 4,  // Not implemented.
