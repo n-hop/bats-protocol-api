@@ -50,10 +50,14 @@ enum class BatsListenEvent : uint8_t {
   BATS_LISTEN_SUCCESS,            // listen success.
   BATS_LISTEN_ACCEPTED_ERROR,     // accepted connection error.
   BATS_LISTEN_ALREADY_IN_LISTEN,  // already in listen state.
+  BATS_LISTEN_STOPPED,            // listen stopped.
 };
 
-/// @brief IOContext will emit those events when the state of the connection changes. Within one BatsConnection,the
-/// callback is thread-safe.
+///
+/// @brief IOContext will emit those events when the state of the connection changes.
+///
+/// Within one BatsConnection,thecallback is thread-safe.
+///
 enum class BatsConnEvent : uint8_t {
   BATS_CONNECTION_NONE = 0,
   BATS_CONNECTION_FAILED,             // conenction failed.
@@ -70,39 +74,69 @@ enum class BatsConnEvent : uint8_t {
 };
 
 class BatsConfigImpl;
+
+///
 /// @brief The configuration for BATS protocol instance.
+///
 class BatsConfiguration {
  public:
   BatsConfiguration();
   ~BatsConfiguration();
+
+  ///
   /// @brief Set the transport mode. Currently, only UDP and TCP are supported.
   /// @param mode
+  ///
   void SetMode(TransMode mode);
-  /// @brief Set the congestion control algorithm. In BATS protocol, transmission control and the congestion control are
-  /// decoupled.
+
+  ///
+  /// @brief Set the congestion control algorithm.
+  /// In BATS protocol, transmission control and the congestion control are decoupled.
   /// @param cc Congestion control algorithm. currently, only BBR is supported.
+  ///
   void SetCC(CongestionControl cc);
+
+  ///
   /// @brief Set the timeout for connecting to the remote address.
+  /// @param timeout timeout in #FIXME units
+  ///
   void SetTimeout(int timeout);
+
+  ///
   /// @brief Set the TCP/UDP socket port which is used for listening or connecting.
   /// @param local_port The local port to be set.
+  ///
   void SetLocalPort(int local_port);
   void SetLocalAddress(const std::string& local_addr);
+
+  ///
   /// @brief The certificate file and key file are used for TLS connection.
-  /// @param cert_file
+  /// @param cert_file the certificate file path. The format should be #FIXME
+  ///
   void SetCertFile(const std::string& cert_file);
+
   void SetKeyFile(const std::string& key_file);
+
   /// @brief Enable the compression for the data transmission.
   void EnableCompression(bool enable);
   void EnableEncryption(bool enable);
+
+  ///
   /// @brief Choose the protocol frame type.
   /// @param frame_type
+  ///
   void SetFrameType(FrameType frame_type);
+
+  ///
   /// @brief Set the remote address and port which is used for connecting.
   /// @param remote_addr The remote address to be set, in IPv4/IPv6 string format.
+  ///
   void SetRemoteAddr(const std::string& remote_addr);
+
+  ///
   /// @brief set the remote port which is used for connecting.
   /// @param remote_port The remote port to be set.
+  ///
   void SetRemotePort(int remote_port);
   const BatsConfigImpl& GetImpl() const { return *impl_; }
   friend std::ostream& operator<<(std::ostream& os, const BatsConfiguration& config);

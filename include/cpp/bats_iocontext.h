@@ -11,27 +11,37 @@
 #ifndef INCLUDE_CPP_BATS_IOCONTEXT_H_
 #define INCLUDE_CPP_BATS_IOCONTEXT_H_
 
+#include <cstring>
 #include <functional>
 
 class IOContextImpl;
 enum class BATSLogLevel : int {
-  TRACE,
-  DEBUG,
-  INFO,
-  WARN,
-  ERROR,
+  LOG_TRACE = 0,
+  LOG_DEBUG,
+  LOG_INFO,
+  LOG_WARN,
+  LOG_ERROR,
 };
 using SigCallback = std::function<void(int sig)>;
-/// @brief IO event processing instance in BATS protocol; each instance will create at least one thread to process IO
-/// events. IOContext can be shared by multiple protocol instances.
+
+///
+/// @brief IO event processing instance in BATS protocol
+/// \note
+/// - Each instance will create at least one thread to process I/O events.
+/// - IOContext can be shared by multiple protocol instances.
+///
 class IOContext {
  public:
   IOContext();
   virtual ~IOContext();
   IOContextImpl& GetImpl() const { return *impl_; }
-  /// @brief Set the log level for current process. The log level can be set to TRACE, DEBUG, INFO, WARN, or ERROR.
-  /// @param level
+
+  ///
+  /// @brief Set the log level for current process.
+  /// @param level The log level can be set to `TRACE`, `DEBUG`, `INFO`, `WARN`, or `ERROR`.
+  ///
   void SetBATSLogLevel(BATSLogLevel level);
+  void SetBATSLogFilePath(const std::string& log_path);
   void SetSignalCallback(SigCallback&& cb);
 
  protected:

@@ -64,8 +64,11 @@ typedef enum {
   bats_frame_header_v0 = 1,    // `bats_framework_header`
 } bats_frame_type_t;
 
-/// @brief IOContext will emit those events when the state of the connection changes. Within one BatsConnection,the
-/// callback is thread-safe.
+///
+/// @brief IOContext will emit those events when the state of the connection changes.
+///
+/// Within one BatsConnection,the callback is thread-safe.
+///
 typedef enum {
   bats_connection_none = 0,
   bats_connection_failed,             // conenction failed.
@@ -88,6 +91,7 @@ typedef enum {
   bats_listen_success,  // listen success.
   bats_listen_accepted_error,
   bats_listen_already_in_listen,  // already in listen state.
+  bats_listen_stopped,            // listen stopped.
 } bats_listen_event_t;
 typedef void (*sig_callback_t)(int sig);
 typedef void (*bats_connection_callback_t)(bats_connection_handle_t conn, bats_conn_event_t event,

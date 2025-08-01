@@ -47,14 +47,15 @@ bats_error_t bats_protocol_start_connect(bats_protocol_handle_t protocol, const 
                                          bats_connection_callback_t c_callback, void* context);
 bats_error_t bats_protocol_start_listen(bats_protocol_handle_t protocol, const char* local_addr, uint16_t local_port,
                                         bats_listen_callback_t c_callback, void* context);
+bats_error_t bats_protocol_stop_listen(bats_protocol_handle_t protocol);
+bats_error_t bats_protocol_stop_connection(bats_protocol_handle_t protocol, bats_connection_handle_t conn);
 
 // ================= Protocol Connection =====================
-void bats_connection_close(bats_connection_handle_t conn);
 bats_error_t bats_connection_send_data(bats_connection_handle_t conn, const unsigned char* data, int length);
 bats_error_t bats_connection_send_file(bats_connection_handle_t conn, const char* file_name);
 void bats_connection_set_callback(bats_connection_handle_t conn, bats_connection_callback_t c_callback, void* context);
-int bats_connection_recv_data(bats_connection_handle_t conn, unsigned char* data, int max_length);
 int bats_connection_is_writable(bats_connection_handle_t conn);
+int bats_connection_get_ideal_buffer_length(bats_connection_handle_t conn);
 
 #ifdef __cplusplus
 }
