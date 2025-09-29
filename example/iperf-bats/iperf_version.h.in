@@ -1,0 +1,26 @@
+/**
+ * @file iperf_verion.h.in
+ * @author Peng LEI (peng.lei@n-hop.com)
+ * @brief
+ * @version 1.0.0
+ * @date 2025-06-27
+ *
+ * Copyright (c) 2025 The n-hop technologies Limited. All Rights Reserved.
+ *
+ */
+#ifndef SRC_EXAMPLE_IPERF_BATS_IPERF_VERSION_H_
+#define SRC_EXAMPLE_IPERF_BATS_IPERF_VERSION_H_
+
+#include <cstdint>
+#include <string>
+
+const uint32_t BATS_IPERF_MAJOR_VERSION = @BATS_IPERF_MAJOR_VERSION@;
+const uint32_t BATS_IPERF_MINOR_VERSION = @BATS_IPERF_MINOR_VERSION@;
+const char BATS_IPERF_BUILD_TYPE[] = {"@CMAKE_BUILD_TYPE@ \n"};
+const char BATS_IPERF_VERSION_STR[] = {
+    "BATS Iperf version: @BATS_IPERF_VERSION@(@GIT_SHA1_SHORT@)  Build "
+    "date: " __DATE__ " " __TIME__};
+
+const char BATS_IPERF_COMPILER_INFO_STR[] = {"@COMPILER_INFO@ "};
+
+#endif  // SRC_EXAMPLE_IPERF_BATS_IPERF_VERSION_H_

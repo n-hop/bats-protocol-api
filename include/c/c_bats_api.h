@@ -9,8 +9,8 @@
  *
  */
 
-#ifndef INCLUDE_C_BATS_API_H_
-#define INCLUDE_C_BATS_API_H_
+#ifndef INCLUDE_C_C_BATS_API_H_
+#define INCLUDE_C_C_BATS_API_H_
 
 #include "c_bats_types.h"
 
@@ -22,7 +22,7 @@ extern "C" {
 bats_context_handle_t bats_context_create();
 void bats_context_destroy(bats_context_handle_t ctx);
 void bats_context_set_log_level(bats_context_handle_t ctx, bats_log_level_t level);
-void bats_context_get_signal_callback(bats_context_handle_t ctx, sig_callback_t c_callback);
+void bats_context_set_signal_callback(bats_context_handle_t ctx, sig_callback_t c_callback);
 
 // ================= Config =====================
 bats_config_handle_t bats_config_create();
@@ -61,4 +61,4 @@ int bats_connection_get_ideal_buffer_length(bats_connection_handle_t conn);
 }
 #endif
 
-#endif  // INCLUDE_C_BATS_API_H_
+#endif  // INCLUDE_C_C_BATS_API_H_

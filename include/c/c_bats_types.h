@@ -8,8 +8,8 @@
  * Copyright (c) 2025 The n-hop technologies Limited. All Rights Reserved.
  *
  */
-#ifndef INCLUDE_C_BATS_TYPES_H_
-#define INCLUDE_C_BATS_TYPES_H_
+#ifndef INCLUDE_C_C_BATS_TYPES_H_
+#define INCLUDE_C_C_BATS_TYPES_H_
 
 #include <stdint.h>
 
@@ -71,17 +71,20 @@ typedef enum {
 ///
 typedef enum {
   bats_connection_none = 0,
-  bats_connection_failed,             // conenction failed.
-  bats_connection_established,        // connection established.
-  bats_connection_timeout,            // connection timeout in 2s.
-  bats_connection_shutdown_by_peer,   // connection shutdown by peer.
-  bats_connection_writable,           // connection writable, ready to send data.
-  bats_connection_data_received,      // connections has received data from peer.
-  bats_connection_send_complete,      // connection sent last data complete.
-  bats_connection_buffer_full,        // unable to write since the buffer of this connection is full.
-  bats_connection_closed,             // connection closed.
-  bats_connection_error,              // some errors in current connection
-  bats_connection_already_connected,  // connection already established.
+  bats_connection_failed,               // conenction failed.
+  bats_connection_established,          // connection established.
+  bats_connection_timeout,              // connection timeout in 2s.
+  bats_connection_shutdown_by_peer,     // connection shutdown by peer.
+  bats_connection_writable,             // connection writable, ready to send data.
+  bats_connection_data_received,        // connections has received data from peer.
+  bats_connection_send_complete,        // connection sent last data complete.
+  bats_connection_send_data_error,      // error when sending data.
+  bats_connection_buffer_full,          // unable to write since the buffer of this connection is full.
+  bats_connection_closed,               // connection closed.
+  bats_connection_error,                // some errors in current connection
+  bats_connection_already_connected,    // connection already established.
+  bats_connection_ideal_buffer_length,  // update it's ideal buffer length when underlying MSS is changed.
+  bats_connection_all_data_acked,
 } bats_conn_event_t;
 
 typedef enum {
@@ -94,7 +97,7 @@ typedef enum {
   bats_listen_stopped,            // listen stopped.
 } bats_listen_event_t;
 typedef void (*sig_callback_t)(int sig);
-typedef void (*bats_connection_callback_t)(bats_connection_handle_t conn, bats_conn_event_t event,
+typedef bool (*bats_connection_callback_t)(bats_connection_handle_t conn, bats_conn_event_t event,
                                            const unsigned char* data, int length, void* user_data);
 
 typedef void (*bats_listen_callback_t)(bats_connection_handle_t conn, bats_listen_event_t event, void* user_data);
@@ -103,4 +106,4 @@ typedef void (*bats_listen_callback_t)(bats_connection_handle_t conn, bats_liste
 }
 #endif
 
-#endif  // INCLUDE_C_BATS_TYPES_H_
+#endif  // INCLUDE_C_C_BATS_TYPES_H_

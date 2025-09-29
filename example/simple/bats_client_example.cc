@@ -1,0 +1,172 @@
+/**
+ * @file bats_client_example.cc
+ * @author Lei Peng (peng.lei@n-hop.com)
+ * @brief
+ * @version 1.0.0
+ * @date 2025-03-08
+ *
+ * Copyright (c) 2025 The n-hop technologies Limited. All Rights Reserved.
+ *
+ */
+#include <atomic>
+#include <csignal>
+#include <cstring>
+#include <iostream>
+#include <limits>
+#include <thread>
+
+#include "include/cpp/bats_config.h"
+#include "include/cpp/bats_connection.h"
+#include "include/cpp/bats_iocontext.h"
+#include "include/cpp/bats_protocol.h"
+
+static int stop_signal_value(0);
+
+class BATSSender {
+ public:
+  BATSSender(BatsProtocol& protocol, int send_cnt, TransMode mode)
+      : protocol_(protocol), send_quota(send_cnt), bats_mode_(mode) {
+    send_data.resize(default_buffer_max_sz);
+    send_data.assign(default_buffer_max_sz, 0x0f);
+  }
+  ~BATSSender() = default;
+  bool ConnectionCallback(const IBatsConnPtr& new_conn, const BatsConnEvent& event, const octet* data, int length,
+                          void* user) {
+    switch (event) {
+      case BatsConnEvent::BATS_CONNECTION_FAILED:
+        std::cout << "[bats_client_example] Connection failed." << '\n';
+        is_connect_failed = true;
+        break;
+      case BatsConnEvent::BATS_CONNECTION_CLOSED:
+        std::cout << "[bats_client_example] Connection closed." << '\n';
+        is_connected = false;
+        break;
+      case BatsConnEvent::BATS_CONNECTION_SHUTDOWN_BY_PEER:
+        std::cout << "[bats_client_example] Connection shutdown by peer." << '\n';
+        is_connected = false;
+        is_connect_failed = true;
+        break;
+      case BatsConnEvent::BATS_CONNECTION_ESTABLISHED:
+        std::cout << "[bats_client_example] Connection established." << '\n';
+        bats_connection = new_conn;
+        UpdateDataBlockLength(bats_connection->GetIdealBufferLength());
+        is_connected = true;
+        break;
+      case BatsConnEvent::BATS_CONNECTION_DATA_RECEIVED:
+        std::cout << "[bats_client_example] Connection received " << length << " bytes"
+                  << " " << recv_cnt_++ << '\n';
+        break;
+      case BatsConnEvent::BATS_CONNECTION_BUFFER_FULL:
+        is_writable = false;
+        // std::cout << "[bats_client_example] Connection buffer full." << '\n';
+        break;
+      case BatsConnEvent::BATS_CONNECTION_WRITABLE:
+        // std::cout << "[bats_client_example] Connection is writable." << '\n';
+        is_writable = true;
+        break;
+      case BatsConnEvent::BATS_CONNECTION_IDEAL_BUFFER_LENGTH:
+        // the ideal length may change due to network condition change.
+        UpdateDataBlockLength(length);
+        break;
+      default:
+        break;
+    }
+    return true;
+  }
+
+  void StartConnect() {
+    std::cout << "[bats_client_example] Start connect to server..." << '\n';
+    using namespace std::placeholders;  // NOLINT
+    protocol_.StartConnect("127.0.0.1", 12345, std::bind(&BATSSender::ConnectionCallback, this, _1, _2, _3, _4, _5),
+                           nullptr);
+  }
+
+  void StartSend() {
+    while (is_connected == false && stop_signal_value != SIGINT) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+      if (is_connect_failed) {
+        if (timeout_cnt_ >= max_timeout_cnt_) {
+          // simple timeout reconnect
+          timeout_cnt_ = 0;
+          is_connect_failed = false;
+          using namespace std::placeholders;  // NOLINT
+          std::cout << "[bats_client_example] Reconnect to server..." << '\n';
+          protocol_.StartConnect("127.0.0.1", 12345,
+                                 std::bind(&BATSSender::ConnectionCallback, this, _1, _2, _3, _4, _5), nullptr);
+          std::cout << "[bats_client_example] StartConnect returned..." << '\n';
+        }
+      }
+      timeout_cnt_++;
+    }
+    std::cout << "[bats_client_example] connection is ready, start sending data." << '\n';
+    if (send_quota == 0) {
+      send_quota = std::numeric_limits<uint64_t>::max();
+    }
+    std::cout << "[bats_client_example] send_cnt: " << send_quota << '\n';
+    while (is_connected && send_quota != 0 && stop_signal_value != SIGINT) {
+      if (is_writable == false) {
+        std::this_thread::yield();
+        continue;
+      }
+      // keep sending.
+      if (bats_connection->SendData(reinterpret_cast<const octet*>(send_data.data()), cur_ideal_length) == false) {
+        // not a successful sending due to many possible reasons.
+        continue;
+      }
+      send_quota--;
+    }
+
+    if (is_connected == false) {
+      std::cout << "[bats_client_example] Connection closed, stop send. " << send_quota << '\n';
+    } else {
+      std::cout << "[bats_client_example] Sending data is finished. " << send_quota << '\n';
+    }
+  }
+
+ private:
+  void UpdateDataBlockLength(int ideal_length) {
+    assert(ideal_length > 0 && ideal_length <= default_buffer_max_sz);
+    cur_ideal_length = ideal_length;
+    std::cout << "[bats_client_example] UpdateDataBlockLength with ideal_length {} " << ideal_length << '\n';
+  }
+
+  static constexpr int default_buffer_max_sz = 150000;
+  BatsProtocol& protocol_;
+  octetVec send_data;
+  uint64_t send_quota = 10;
+  uint64_t recv_cnt_ = 0;
+  uint32_t timeout_cnt_ = 0;
+  uint32_t max_timeout_cnt_ = 30;  // 100ms * 30
+  std::atomic<int> cur_ideal_length = 0;
+  std::atomic<bool> is_connect_failed = {false};
+  std::atomic<bool> is_connected = {false};
+  std::atomic<bool> is_writable = {false};
+  IBatsConnPtr bats_connection = nullptr;
+  TransMode bats_mode_ = TransMode::BTP;
+};
+int main(int argc, char* argv[]) {
+  int mode = 0;
+  int send_cnt = 0;
+  if (argc >= 2) {
+    send_cnt = std::stoi(argv[1]);
+  }
+  if (argc == 3) {
+    mode = std::stoi(argv[2]);
+  }
+  std::cout << "[bats_client_example] <send_cnt> <mode> " << send_cnt << "," << mode << '\n';
+  IOContext io;
+  io.SetBATSLogLevel(BATSLogLevel::LOG_WARN);
+  io.SetSignalCallback([](int sig) { stop_signal_value = sig; });
+  BatsConfiguration config;
+  config.SetMode(static_cast<TransMode>(mode));  // default to BTP
+  config.SetTimeout(2000);                       // 2000ms
+  BatsProtocol protocol(io, config);
+  BATSSender bats_sender(protocol, send_cnt, static_cast<TransMode>(mode));
+
+  bats_sender.StartConnect();
+  bats_sender.StartSend();
+
+  // wait for receiving echo back data otherwise the remote side can't send data back.
+  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+  return 0;
+}

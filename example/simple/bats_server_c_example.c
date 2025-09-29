@@ -22,8 +22,8 @@ static bool is_stopped = false;
 
 void signal_handler(int signum) { stop_signal_value = signum; }
 
-void my_connection_callback(bats_connection_handle_t conn, bats_conn_event_t event, const unsigned char* data,
-                            int length, void* user_data) {
+bool bats_connection_callback(bats_connection_handle_t conn, bats_conn_event_t event, const unsigned char* data,
+                              int length, void* user_data) {
   static int recv_cnt = 0;
   switch (event) {
     case bats_connection_established:
@@ -32,7 +32,6 @@ void my_connection_callback(bats_connection_handle_t conn, bats_conn_event_t eve
     case bats_connection_data_received:
       printf("[bats_server_example] Data received: len %d SEQ %d\n", length, recv_cnt++);
       bats_connection_send_data(conn, data, length);
-      bats_connection_close(conn);
       break;
     case bats_connection_writable:
       printf("[bats_server_example] Connection writable\n");
@@ -55,13 +54,14 @@ void my_connection_callback(bats_connection_handle_t conn, bats_conn_event_t eve
       printf("[bats_server_example] Unknown connection event %d\n", (int)event);
       break;
   }
+  return true;
 }
 
-void my_listener_callback(bats_connection_handle_t conn, bats_listen_event_t event, void* user_data) {
+void bats_listener_callback(bats_connection_handle_t conn, bats_listen_event_t event, void* user_data) {
   switch (event) {
     case bats_listen_new_connection:
       printf("[bats_server_example] New connection accepted\n");
-      bats_connection_set_callback(conn, my_connection_callback, user_data);
+      bats_connection_set_callback(conn, bats_connection_callback, user_data);
       break;
     case bats_listen_failed:
       printf("[bats_server_example] Failed to listen\n");
@@ -95,7 +95,7 @@ int main(int argc, char* argv[]) {
     return -1;
   }
   bats_context_set_log_level(ctx, bats_log_level_info);
-  bats_context_get_signal_callback(ctx, signal_handler);
+  bats_context_set_signal_callback(ctx, signal_handler);
 
   bats_config_handle_t config = bats_config_create();
   if (!config) {
@@ -121,7 +121,7 @@ int main(int argc, char* argv[]) {
   }
 
   // Set up listener callback
-  bats_error_t err = bats_protocol_start_listen(protocol, "127.0.0.1", 12345, my_listener_callback, NULL);
+  bats_error_t err = bats_protocol_start_listen(protocol, "127.0.0.1", 12345, bats_listener_callback, NULL);
   if (err != bats_error_none) {
     printf("[bats_server_example] Failed to start listening: %d\n", err);
     bats_protocol_destroy(protocol);
@@ -136,7 +136,7 @@ int main(int argc, char* argv[]) {
     sleep(1);
   }
   printf("exiting...\n");
-  // bats_context_get_signal_callback
+  // bats_context_set_signal_callback
 
   // Clean up
   bats_protocol_destroy(protocol);

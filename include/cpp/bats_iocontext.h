@@ -13,6 +13,7 @@
 
 #include <cstring>
 #include <functional>
+#include <string>
 
 class IOContextImpl;
 enum class BATSLogLevel : int {

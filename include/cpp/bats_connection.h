@@ -19,7 +19,7 @@
 
 class IBatsConnection;
 using IBatsConnPtr = std::shared_ptr<IBatsConnection>;
-using ConnectionCallback = std::function<void(const IBatsConnPtr&, const BatsConnEvent&, const octet*, int, void*)>;
+using ConnectionCallback = std::function<bool(const IBatsConnPtr&, const BatsConnEvent&, const octet*, int, void*)>;
 using ListenCallback = std::function<void(const IBatsConnPtr&, const BatsListenEvent&, void*)>;
 
 /// @brief BatsConnection is the interface for writing/reading data to/from the network.

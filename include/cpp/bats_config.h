@@ -60,17 +60,21 @@ enum class BatsListenEvent : uint8_t {
 ///
 enum class BatsConnEvent : uint8_t {
   BATS_CONNECTION_NONE = 0,
-  BATS_CONNECTION_FAILED,             // conenction failed.
-  BATS_CONNECTION_ESTABLISHED,        // connection established.
-  BATS_CONNECTION_TIMEOUT,            // connection timeout in 2s.
-  BATS_CONNECTION_SHUTDOWN_BY_PEER,   // connection shutdown by peer.
-  BATS_CONNECTION_WRITABLE,           // connection writable, ready to send data.
-  BATS_CONNECTION_DATA_RECEIVED,      // connections has received data from peer.
-  BATS_CONNECTION_SEND_COMPLETE,      // connection sent last data complete.
-  BATS_CONNECTION_BUFFER_FULL,        // unable to write since the buffer of this connection is full.
-  BATS_CONNECTION_CLOSED,             // connection closed.
-  BATS_CONNECTION_ERROR,              // some errors in current connection
-  BATS_CONNECTION_ALREADY_CONNECTED,  // connection already established.
+  BATS_CONNECTION_FAILED,               // conenction failed.
+  BATS_CONNECTION_ESTABLISHED,          // connection established.
+  BATS_CONNECTION_TIMEOUT,              // connection timeout in 2s.
+  BATS_CONNECTION_SHUTDOWN_BY_PEER,     // connection shutdown by peer.
+  BATS_CONNECTION_WRITABLE,             // connection writable, ready to send data.
+  BATS_CONNECTION_DATA_RECEIVED,        // connections has received data from peer.
+  BATS_CONNECTION_SEND_COMPLETE,        // connection sent last data complete.
+  BATS_CONNECTION_SEND_DATA_ERROR,      // error when sending data.
+  BATS_CONNECTION_BUFFER_FULL,          // unable to write since the buffer of this connection is full.
+  BATS_CONNECTION_CLOSED,               // connection closed.
+  BATS_CONNECTION_ERROR,                // some errors in current connection
+  BATS_CONNECTION_ALREADY_CONNECTED,    // connection already established.
+  BATS_CONNECTION_IDEAL_BUFFER_LENGTH,  // update it's ideal buffer length when underlying MSS is changed.
+  BATS_CONNECTION_ALL_DATA_ACKED,  // send the notification when all the sent data has been acked by peers (valid for
+                                   // BRTP).
 };
 
 class BatsConfigImpl;
