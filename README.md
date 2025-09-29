@@ -66,7 +66,8 @@ Logging output of a loopback test with the network coding enabled protocol BRTP:
 | 8.0%              | 800.47 Mbps | 720.81 Mbps | 555.95 Mbps | 430.73 Mbps |
 
 
-> [!TIP] Definitions and abbreviations
+> [!TIP] 
+> Definitions and abbreviations
 > - 1. All tests were tested with the fixed Bandwidth 1000Mbps
 > - 2. Latency: the one-way delay of the link/path.
 > - 3. Loss Rate: the packet loss takes effect on the bidirection of the link/path.
