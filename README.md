@@ -55,7 +55,7 @@ Logging output of a loopback test with the network coding enabled protocol BRTP:
 
 ![alt text](imgs/bats_iperf_test.png)
 
-## Performance matrix
+## Performance matrix of BRTP
 
 | Loss Rate/Latency | 10ms        | 30ms        | 50ms        | 70ms        |
 | ----------------- | ----------- | ----------- | ----------- | ----------- |
@@ -66,8 +66,6 @@ Logging output of a loopback test with the network coding enabled protocol BRTP:
 | 8.0%              | 800.47 Mbps | 720.81 Mbps | 555.95 Mbps | 430.73 Mbps |
 | 10.0%             | 786.96 Mbps | 759.27 Mbps | 510.21 Mbps | 455.38 Mbps |
 
-
-
 > [!TIP] 
 > Definitions and abbreviations
 > - 1. All tests were tested with the fixed Bandwidth 1000Mbps
@@ -76,3 +74,14 @@ Logging output of a loopback test with the network coding enabled protocol BRTP:
 > - 4. Data format in the cell: <br>[Delivery rate]
 >    - Delivery rate: The average receiving rate during the test.
 > - 5. Latency and Loss Rate are simulated in [Oasis](https://github.com/n-hop/oasis/blob/main/docs/tc-strategy.md).
+>
+
+## Performance matrix of TCP BBR
+
+| Loss Rate/Latency | 10ms       | 30ms       | 50ms       | 70ms      |
+| ----------------- | ---------- | ---------- | ---------- | --------- |
+| 10.0%             | 461.0 Mbps | 270.0 Mbps | 175.0 Mbps | 13.4 Mbps |
+
+> [!TIP] 
+> Using the same test environment as BRTP.
+> Kernel version: 5.15.0-153-
