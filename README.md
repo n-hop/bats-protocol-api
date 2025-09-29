@@ -64,6 +64,8 @@ Logging output of a loopback test with the network coding enabled protocol BRTP:
 | 4.0%              | 879.99 Mbps | 811.36 Mbps | 683.54 Mbps | 485.85 Mbps |
 | 6.0%              | 853.18 Mbps | 762.74 Mbps | 662.22 Mbps | 540.73 Mbps |
 | 8.0%              | 800.47 Mbps | 720.81 Mbps | 555.95 Mbps | 430.73 Mbps |
+| 10.0%             | 786.96 Mbps | 759.27 Mbps | 510.21 Mbps | 455.38 Mbps |
+
 
 
 > [!TIP] 
