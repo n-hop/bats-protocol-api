@@ -83,5 +83,5 @@ Logging output of a loopback test with the network coding enabled protocol BRTP:
 | 10.0%             | 461.0 Mbps | 270.0 Mbps | 175.0 Mbps | 13.4 Mbps |
 
 > [!TIP] 
-> Using the same test environment as BRTP.
-> Kernel version: 5.15.0-153-
+> - Using the same test environment as BRTP.
+> - Kernel version: 5.15.0-153-generic
