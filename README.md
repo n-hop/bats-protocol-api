@@ -20,6 +20,18 @@
   and `ConnectionCallback` is used to receive connection related events.
   In most cases, the asynchronous events are emitted by `IOContext`'s thread while the direct failure of API calls are emitted by the users' thread.
 
+## About BRTP
+
+BRTP (BATS Reliable Transport Protocol) is a reliable transport protocol of user space. It employs a novel coding scheme ([BATS™](https://n-hop.com/wp-content/uploads/2022/12/BATS.pdf)) to achieve high throughput and low latency.
+
+Outstanding features of BRTP:
+
+- Insensitivity to packet loss
+  - High bandwidth utilization
+  - Lower transmission latency
+  - Lower retransmission rate (compared with classic ARQ)
+- Fine tuned congestion control(bbr)
+
 ## Test tools
 
 ```text
