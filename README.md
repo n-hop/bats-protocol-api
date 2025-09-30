@@ -78,9 +78,10 @@ Logging output of a loopback test with the network coding enabled protocol BRTP:
 
 ## Performance matrix of TCP BBR
 
-| Loss Rate/Latency | 10ms       | 30ms       | 50ms       | 70ms      |
-| ----------------- | ---------- | ---------- | ---------- | --------- |
-| 10.0%             | 461.0 Mbps | 270.0 Mbps | 175.0 Mbps | 13.4 Mbps |
+| Loss Rate/Latency | 10ms       | 30ms       | 50ms       | 70ms       |
+| ----------------- | ---------- | ---------- | ---------- | ---------- |
+| 0.0%              | 938.0 Mbps | 913.0 Mbps | 622.0 Mbps | 432.0 Mbps |
+| 10.0%             | 461.0 Mbps | 270.0 Mbps | 175.0 Mbps | 13.4 Mbps  |
 
 > [!TIP] 
 > - Using the same test environment as BRTP.
