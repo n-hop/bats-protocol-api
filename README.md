@@ -55,6 +55,8 @@ Logging output of a loopback test with the network coding enabled protocol BRTP:
 
 ![alt text](imgs/bats_iperf_test.png)
 
+About file transfer mode, check details in [bats_iperf file transfer mode](example/iperf-bats/bats_iperf.md)
+
 ## Performance matrix of BRTP
 
 | Loss Rate/Latency | 10ms        | 30ms        | 50ms        | 70ms        |
