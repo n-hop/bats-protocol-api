@@ -71,14 +71,14 @@ About file transfer mode, check details in [bats_iperf file transfer mode](examp
 
 ## Performance matrix of BRTP
 
-| Loss Rate/Latency | 10ms        | 30ms        | 50ms        | 70ms        |
-| ----------------- | ----------- | ----------- | ----------- | ----------- |
-| 0.0%              | 949.5 Mbps  | 940.1 Mbps  | 927.81 Mbps | 979.71 Mbps |
-| 2.0%              | 888.33 Mbps | 907.4 Mbps  | 757.49 Mbps | 719.43 Mbps |
-| 4.0%              | 879.99 Mbps | 811.36 Mbps | 683.54 Mbps | 485.85 Mbps |
-| 6.0%              | 853.18 Mbps | 762.74 Mbps | 662.22 Mbps | 540.73 Mbps |
-| 8.0%              | 800.47 Mbps | 720.81 Mbps | 555.95 Mbps | 430.73 Mbps |
-| 10.0%             | 786.96 Mbps | 759.27 Mbps | 510.21 Mbps | 455.38 Mbps |
+| Loss Rate/Latency | 10ms        | 30ms        | 50ms        | 70ms        | 100ms       |
+| ----------------- | ----------- | ----------- | ----------- | ----------- | ----------- |
+| 0.0%              | 949.5 Mbps  | 940.1 Mbps  | 927.81 Mbps | 979.71 Mbps | 928.81 Mbps |
+| 2.0%              | 888.33 Mbps | 907.4 Mbps  | 757.49 Mbps | 719.43 Mbps | 484.99 Mbps |
+| 4.0%              | 879.99 Mbps | 811.36 Mbps | 683.54 Mbps | 485.85 Mbps | 573.06 Mbps |
+| 6.0%              | 853.18 Mbps | 762.74 Mbps | 662.22 Mbps | 540.73 Mbps | 495.30 Mbps |
+| 8.0%              | 800.47 Mbps | 720.81 Mbps | 555.95 Mbps | 430.73 Mbps | 428.17 Mbps |
+| 10.0%             | 786.96 Mbps | 759.27 Mbps | 510.21 Mbps | 455.38 Mbps | 382.22 Mbps |
 
 > [!TIP] 
 > Definitions and abbreviations
