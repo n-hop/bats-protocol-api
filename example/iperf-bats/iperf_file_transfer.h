@@ -96,6 +96,7 @@ class IperfFileTransfer : public IIperfTest, public std::enable_shared_from_this
   bool IsStreamDone() override;
   bool TestFinishState() override;
   void PrintStreamSendSummary() override;
+  void TryPrintSummary() override {}
 
  private:
   bool IsInActive(struct FileStream* file_stream) const;

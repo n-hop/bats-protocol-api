@@ -153,9 +153,9 @@ bool IperfFileTransfer::Start() {
   // 1. start control channel.
   BatsConfiguration bats_config;
   // default to TCP
-  bats_config.SetCertFile(bats_default_cert_file);
-  bats_config.SetKeyFile(bats_default_key_file);
-  bats_config.SetMode(static_cast<TransMode>(10));
+  bats_config.transport_mode = static_cast<BATSTransMode>(10);
+  bats_config.cert_file = bats_default_cert_file;
+  bats_config.key_file = bats_default_key_file;
 
   // use the different port for control channel.
   if (data_chn_connector_ == nullptr) {
@@ -437,7 +437,7 @@ void IperfFileTransfer::SendResponseOk() {
   control_header->action_code = 0x04;
   control_header->param0 = 0x00;
 
-  ctrl_chn_->SendData(iper_control_data.data(), iper_control_data.size());
+  ctrl_chn_->SendData(iper_control_data.data(), iper_control_data.size(), BatsSendFlag::BATS_SEND_FLAG_NONE);
   spdlog::info("[IperfFileTransfer] Test ack is sent.");
 }
 
@@ -452,16 +452,16 @@ void IperfFileTransfer::SendResponseDenied() {
   control_header->action_code = 0x04;
   control_header->param0 = 0x01;
 
-  ctrl_chn_->SendData(iper_control_data.data(), iper_control_data.size());
+  ctrl_chn_->SendData(iper_control_data.data(), iper_control_data.size(), BatsSendFlag::BATS_SEND_FLAG_NONE);
   spdlog::info("[IperfFileTransfer] Test ack is sent.");
 }
 
 void IperfFileTransfer::OnRecvResponse() {
   BatsConfiguration bats_config;
-  bats_config.SetTimeout(5 * 1000);  // 5s (shutdown after idle for 5s)
-  bats_config.SetMode(static_cast<TransMode>(test_config_.protocol));
-  bats_config.SetCertFile(bats_default_cert_file);
-  bats_config.SetKeyFile(bats_default_key_file);
+  bats_config.connection_timeout = 5 * 1000;  // 5s (shutdown after idle for 5s)
+  bats_config.transport_mode = static_cast<BATSTransMode>(test_config_.protocol);
+  bats_config.cert_file = bats_default_cert_file;
+  bats_config.key_file = bats_default_key_file;
 
   // reload.
   data_chn_connector_->LoadConfig(bats_config);
@@ -504,7 +504,7 @@ void IperfFileTransfer::SendFileTransferRequest() {
   // body (Serialize)
   ptr = test_config_.Serialize(ptr);
 
-  ctrl_chn_->SendData(iper_control_data.data(), iper_control_data.size());
+  ctrl_chn_->SendData(iper_control_data.data(), iper_control_data.size(), BatsSendFlag::BATS_SEND_FLAG_NONE);
   spdlog::info("[IperfFileTransfer] File transfer request is sent.");
   state_ = TestState::TEST_EXCHANGE_PARAMETERS;
 }
@@ -533,10 +533,11 @@ void IperfFileTransfer::HandleFileTransferRequest(const struct iperf_control_dat
   spdlog::info("[IperfFileTransfer] will receive {} bytes, current available space {}", total_bytes, si.available);
 
   BatsConfiguration bats_config;
-  bats_config.SetTimeout(5 * 1000);  // 5s (shutdown after idle for 5s)
-  bats_config.SetCertFile(bats_default_cert_file);
-  bats_config.SetKeyFile(bats_default_key_file);
-  bats_config.SetMode(static_cast<TransMode>(received_test_config.protocol));
+  bats_config.connection_timeout = 5 * 1000;  // 5s (shutdown after idle for 5s)
+  bats_config.transport_mode = static_cast<BATSTransMode>(received_test_config.protocol);
+  bats_config.cert_file = bats_default_cert_file;
+  bats_config.key_file = bats_default_key_file;
+
   data_chn_listener_ = std::make_shared<BatsProtocol>(io_, bats_config);
   using namespace std::placeholders;  // NOLINT
   auto resolution = test_config_.resolution;
@@ -879,9 +880,9 @@ void IperfFileTransfer::CreateFileTransferThread(struct FileStream* file_stream)
             bytes_to_send += nread;
             assert(bytes_to_send >= nread + sizeof(struct file_bk_header));
           }
-
+          auto flags = file_bk_hdr->fin ? BatsSendFlag::BATS_SEND_FLAG_FIN : BatsSendFlag::BATS_SEND_FLAG_NONE;
           // Wait until writable or error in sending.
-          bool send_ok = file_stream->stream->SendData(buf_to_send_ptr, bytes_to_send);
+          bool send_ok = file_stream->stream->SendData(buf_to_send_ptr, bytes_to_send, flags);
           while (send_ok == false) {
             if (IsInActive(file_stream) == false) {
               break;
@@ -891,7 +892,7 @@ void IperfFileTransfer::CreateFileTransferThread(struct FileStream* file_stream)
             }
             if (file_stream->is_writable.load(std::memory_order_seq_cst) == true) {
               // retry after timeout when it's writable.
-              send_ok = file_stream->stream->SendData(buf_to_send_ptr, bytes_to_send);
+              send_ok = file_stream->stream->SendData(buf_to_send_ptr, bytes_to_send, flags);
             } else {
               // wait only if not writable.
               file_stream->writable_wait->EmptyWait();

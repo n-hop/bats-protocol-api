@@ -27,6 +27,8 @@
 #include "src/include/time.h"
 #include "src/util/ring_arithmetic.h"
 
+static constexpr int max_bats_iperf_buffer_for_rc = 60000000;
+static constexpr int max_bats_iperf_buffer = 150000;
 static inline std::stringstream PrintLastInterval(const TestInterval& last_interval, int stream_id, float interval,
                                                   int num, bool is_precise_time_enabled) {
   std::stringstream ss;
@@ -117,8 +119,9 @@ IperfStream::IperfStream(IOContext& io, std::basic_ofstream<char>& log_stream, T
   report_.stream_id = g_stream_id++;
   stream_identifier_ = get_time_in_ms<ClockType::MONOTONIC>() + report_.stream_id;
 
-  iperf_data_.resize(150000);
-  iperf_data_.assign(150000, iperf_char);
+  auto max_buf_sz = (config_.protocol == 2 ? max_bats_iperf_buffer_for_rc : max_bats_iperf_buffer);
+  iperf_data_.resize(max_buf_sz);
+  iperf_data_.assign(max_buf_sz, iperf_char);
   {
     iperf_test_header* test_data = reinterpret_cast<iperf_test_header*>(iperf_data_.data());
     test_data->magic = bats_iperf_magic_code;
@@ -126,25 +129,26 @@ IperfStream::IperfStream(IOContext& io, std::basic_ofstream<char>& log_stream, T
   }
 
   BatsConfiguration bats_config;
-  bats_config.SetTimeout(config_.interval * config_.time * 1000);
-  bats_config.SetMode(static_cast<TransMode>(config_.protocol));
 
-  if (config_.protocol == 0 || config_.protocol == 1) {
-    bats_config.SetFrameType(FrameType::BATS_HEADER_V1);
+  bats_config.connection_timeout = config_.interval * config_.time * 1000;
+  bats_config.transport_mode = static_cast<BATSTransMode>(config_.protocol);
+  bats_config.cert_file = bats_default_cert_file;
+  bats_config.key_file = bats_default_key_file;
+
+  if (config_.protocol == 0 || config_.protocol == 1 || config_.protocol == 2) {
+    bats_config.frame_type = BATSFrameType::BATS_HEADER_V1;
   }
 
   // udp.quic
   if (config_.protocol == 11 || config_.protocol == 12) {
-    bats_config.SetFrameType(FrameType::TRANSPARENT);
+    bats_config.frame_type = BATSFrameType::TRANSPARENT;
   }
 
   // tcp
   if (config_.protocol == 10) {
-    bats_config.SetFrameType(FrameType::BATS_HEADER_MIN);
+    bats_config.frame_type = BATSFrameType::BATS_HEADER_MIN;
   }
 
-  bats_config.SetCertFile(bats_default_cert_file);
-  bats_config.SetKeyFile(bats_default_key_file);
   // to start new connection with `connector_`
   connector_ = std::make_shared<BatsProtocol>(io_, bats_config);
   report_.sender_report.interval = config_.interval;
@@ -169,9 +173,9 @@ IperfStream::IperfStream(IOContext& io, std::basic_ofstream<char>& log_stream, T
   // accepted connection from listener.
   data_conn_ = conn;
   conn_state_ = ConnectionState::CONN_CONNECTED;
-
-  iperf_data_.resize(150000);
-  iperf_data_.assign(150000, iperf_char);
+  auto max_buf_sz = (config_.protocol == 2 ? max_bats_iperf_buffer_for_rc : max_bats_iperf_buffer);
+  iperf_data_.resize(max_buf_sz);
+  iperf_data_.assign(max_buf_sz, iperf_char);
   {
     iperf_test_header* test_data = reinterpret_cast<iperf_test_header*>(iperf_data_.data());
     test_data->magic = bats_iperf_magic_code;
@@ -206,9 +210,37 @@ IperfStream::~IperfStream() {
 void IperfStream::SwitchDataBlockLength(int ideal_length) {
   // switch the using buffer.
   assert(ideal_length > 0);
-  assert(ideal_length <= 150000);
+  assert(ideal_length <= iperf_data_.size());
   ideal_length_.store(ideal_length, std::memory_order_seq_cst);
   spdlog::info("[IperfStream] Test stream {} SwitchDataBlockLength with ideal_length {} ", this->Id(), ideal_length);
+}
+
+void IperfStream::FinishReport() {
+  if (config_.role == TestRole::ROLE_SENDER) {
+    // actually expect to be in `STREAM_START` when do FinishReport
+    // for sender: (D)  Time is up -> stop send -> FIN -> FIN-ACK -> STREAM_DONE -> print summary.
+    // for sender: (C)  Time is up -> gen summary(FinishReport-> stop send) -> send summary
+    if (state_ == StreamState::STREAM_DONE) {
+      spdlog::warn("[IperfStream] FinishReport can't be called on state STREAM_DONE.");
+      return;
+    }
+    state_ = StreamState::STREAM_STOP;
+    this->GenSendSummary();
+  }
+  if (config_.role == TestRole::ROLE_RECEIVER) {
+    // for receiver: (D)  FIN -> FIN-ACK -> STREAM_DONE
+    // for receiver: (C)  receive summary -> gen summary(FinishReport)
+    state_ = StreamState::STREAM_STOP;
+    if (report_.receiver_report.snapshot_cnt < config_.time / config_.interval) {
+      // force to generate the last snapshot if needed.
+      auto current = get_time_in_ms<ClockType::MONOTONIC>();
+      auto interval =
+          std::llabs(static_cast<int64_t>(current) - static_cast<int64_t>(report_.receiver_report.last_snapshot_time));
+      SnapshotRxTxReport(report_.receiver_report, current, interval);
+      PrintLastInterval();
+    }
+    this->GenReceiveSummary();
+  }
 }
 
 octet* IperfStream::SerializeReport(octet* to_buffer) {
@@ -247,6 +279,7 @@ const octet* IperfStream::DeserializeReport(const octet* from_buffer) {
   from_buffer += sizeof(uint64_t);
   spdlog::info("[IperfStream] DeserializeReport: stream {} bytes {} datagrams {} bitrate {}", report_.stream_id,
                sender_report.summary.bytes, sender_report.summary.datagrams, sender_report.summary.bitrate);
+  is_sum_received_ = true;
   return from_buffer;
 }
 
@@ -360,6 +393,14 @@ std::stringstream IperfStream::PrintSendLastInterval() {
                              config_.is_precise_time_enabled);
 }
 
+void IperfStream::PrintSendRecvSummary() {
+  if (is_sum_printed_.exchange(true)) {
+    return;
+  }
+  this->PrintReceiveSummary();
+  this->PrintSendSummary();
+}
+
 void IperfStream::PrintReceiveSummary() {
   auto ss = PrintSummary(report_.receiver_report.summary, "receiver", report_.stream_id);
   std::cout << ss.str();
@@ -448,7 +489,7 @@ bool IperfStream::UpdateReceived(const octet* data, int length) {
 
   const iperf_test_header* test_header = reinterpret_cast<const iperf_test_header*>(data);
   auto seq = test_header->seq;
-  if (!ValidateReceivedData(data, length)) {
+  if (config_.protocol != 2 && !ValidateReceivedData(data, length)) {
     spdlog::error("[IperfStream] Test stream {} Not iperf test data, seq {}, magic code {}, bats magic code {}",
                   this->Id(), seq, test_header->magic, bats_iperf_magic_code);
     // indicate corruption in data
@@ -460,8 +501,8 @@ bool IperfStream::UpdateReceived(const octet* data, int length) {
 
   if (stream_identifier_ == 0) {
     stream_identifier_ = test_header->stream_identifier;
-    // check stream ISN for reliable protocol
-    if (seq != 0 && (config_.protocol == 1 || config_.protocol == 2 || config_.protocol == 10)) {
+    // check stream ISN for reliable protocol; config_.protocol == 2
+    if (seq != 0 && (config_.protocol == 1 || config_.protocol == 10)) {
       spdlog::error("[IperfStream] Test stream {} receives stream_identifier {}, but seq {} != 0", this->Id(),
                     stream_identifier_, seq);
       // indicate disorder in data receiving
@@ -546,6 +587,9 @@ bool IperfStream::ConnectionCallback(const IBatsConnPtr& new_conn, const BatsCon
       // the ideal length may change due to network condition change.
       spdlog::info("[IperfStream] Test stream {} ideal buf length update to {}", this->Id(), length);
       this->SwitchDataBlockLength(length);
+      break;
+    case BatsConnEvent::BATS_CONNECTION_ALL_DATA_ACKED:
+      // to confirm all sent data were acked.
       break;
     case BatsConnEvent::BATS_CONNECTION_DATA_RECEIVED:
       // to receive any acks.
@@ -667,7 +711,7 @@ void IperfStream::Start() {
       }
 
       // Wait until writable or error in sending.
-      bool send_ok = data_conn_->SendData(data_ptr, current_data_length);
+      bool send_ok = data_conn_->SendData(data_ptr, current_data_length, BatsSendFlag::BATS_SEND_FLAG_NONE);
       while (send_ok == false) {
         if (state_ != StreamState::STREAM_START) {
           break;
@@ -677,7 +721,7 @@ void IperfStream::Start() {
         }
         if (is_writable_.load(std::memory_order_seq_cst) == true) {
           // retry after timeout when it's writable.
-          send_ok = data_conn_->SendData(data_ptr, current_data_length);
+          send_ok = data_conn_->SendData(data_ptr, current_data_length, BatsSendFlag::BATS_SEND_FLAG_NONE);
         } else {
           // wait only if not writable.
           writable_wait_->EmptyWait();
@@ -706,18 +750,33 @@ void IperfStream::SendFIN() {
     test_data->last = 1;
     test_data->ack = 0;
     test_data->has_interval = 0;
-    while (IsConnected() == true &&
-           data_conn_->SendData(reinterpret_cast<const octet*>(iperf_data_.data()), ideal_length_) == false) {
-      // keep sending.
-      // not a successful sending due to many possible reasons.
+
+    // Wait until writable or error in sending.
+    bool send_ok = data_conn_->SendData(reinterpret_cast<const octet*>(iperf_data_.data()), ideal_length_,
+                                        BatsSendFlag::BATS_SEND_FLAG_FIN);
+    while (send_ok == false) {
       if (state_ == StreamState::STREAM_DONE) {
         spdlog::info("[IperfStream] Test stream {} is terminated, no need to send FIN.", this->Id());
-        return;
+        break;
+      }
+      if (has_err_in_send_.load(std::memory_order_seq_cst) == true) {
+        break;
+      }
+      if (is_writable_.load(std::memory_order_seq_cst) == true) {
+        // retry after timeout when it's writable.
+        send_ok = data_conn_->SendData(reinterpret_cast<const octet*>(iperf_data_.data()), ideal_length_,
+                                       BatsSendFlag::BATS_SEND_FLAG_FIN);
+      } else {
+        // wait only if not writable.
+        writable_wait_->EmptyWait();
       }
     }
-    report_.sender_report.summary.bytes += ideal_length_;
-    report_.sender_report.summary.datagrams += 1;
-    spdlog::info("[IperfStream] Test stream {} FIN is sent.", this->Id());
+
+    if (send_ok) {
+      report_.sender_report.summary.bytes += ideal_length_;
+      report_.sender_report.summary.datagrams += 1;
+      spdlog::info("[IperfStream] Test stream {} FIN is sent.", this->Id());
+    }
   } else {
     spdlog::info("[IperfStream] Test stream {} is finished.", this->Id());
     this->PrintSendSummary();
@@ -732,18 +791,33 @@ void IperfStream::OnReceivedFIN() {
   test_data->has_interval = 0;
 
   spdlog::info("[IperfStream] Test stream {} FIN is received", this->Id());
-  while (IsConnected() == true &&
-         data_conn_->SendData(reinterpret_cast<const octet*>(iperf_data_.data()), ideal_length_) == false) {
-    // keep sending.
-    // not a successful sending due to many possible reasons.
+  bool send_ok = data_conn_->SendData(reinterpret_cast<const octet*>(iperf_data_.data()), ideal_length_,
+                                      BatsSendFlag::BATS_SEND_FLAG_FIN);
+  while (send_ok == false) {
     if (state_ == StreamState::STREAM_DONE) {
       spdlog::info("[IperfStream] Test stream {} is terminated, no need to send FIN-ACK.", this->Id());
-      return;
+      break;
+    }
+    if (has_err_in_send_.load(std::memory_order_seq_cst) == true) {
+      break;
+    }
+    if (is_writable_.load(std::memory_order_seq_cst) == true) {
+      // retry after timeout when it's writable.
+      send_ok = data_conn_->SendData(reinterpret_cast<const octet*>(iperf_data_.data()), ideal_length_,
+                                     BatsSendFlag::BATS_SEND_FLAG_FIN);
+    } else {
+      // wait only if not writable.
+      writable_wait_->EmptyWait();
     }
   }
-  spdlog::info("[IperfStream] Test stream {} FIN-ACK is sent.", this->Id());
-  report_.sender_report.summary.bytes += ideal_length_;
-  report_.sender_report.summary.datagrams += 1;
+
+  if (send_ok) {
+    spdlog::info("[IperfStream] Test stream {} FIN-ACK is sent.", this->Id());
+    report_.sender_report.summary.bytes += ideal_length_;
+    report_.sender_report.summary.datagrams += 1;
+  }
+  // Best time to finish the report for receivers.
+  this->FinishReport();
   is_fin_received_ = true;
   state_ = StreamState::STREAM_DONE;
 }

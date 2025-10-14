@@ -114,6 +114,7 @@ class IperfTest : public IIperfTest {
   /// @return
   bool TestFinishState() override;
   void PrintStreamSendSummary() override;
+  void TryPrintSummary() override;
 
  protected:
   bool ControlChannelConnectionCallback(const IBatsConnPtr& ctrl_conn, const BatsConnEvent& event, const octet* data,

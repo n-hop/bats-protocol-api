@@ -105,9 +105,9 @@ int main(int argc, char* argv[]) {
   io.SetSignalCallback([](int sig) { stop_signal_value = sig; });
 
   BatsConfiguration config;
-  config.SetMode(static_cast<TransMode>(mode));  // default to BTP
-  config.SetCertFile(cert_file);
-  config.SetKeyFile(key_file);
+  config.transport_mode = static_cast<BATSTransMode>(mode);
+  config.cert_file = cert_file;
+  config.key_file = key_file;
 
   BatsProtocol protocol(io);
   protocol.LoadConfig(config);

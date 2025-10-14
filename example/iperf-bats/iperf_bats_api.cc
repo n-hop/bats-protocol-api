@@ -114,12 +114,13 @@ TestRole IperfBatsApi::InitFromArgs(int argc, char* argv[]) {
   });
 
   BatsConfiguration bats_config;
-  bats_config.SetTimeout(1000 * 1000);
+  bats_config.connection_timeout = 1000 * 1000;
+  bats_config.frame_type = BATSFrameType::BATS_HEADER_MIN;
   // default to TCP
-  bats_config.SetFrameType(FrameType::BATS_HEADER_MIN);
-  bats_config.SetMode(static_cast<TransMode>(10));
-  bats_config.SetCertFile(bats_default_cert_file);
-  bats_config.SetKeyFile(bats_default_key_file);
+  bats_config.transport_mode = static_cast<BATSTransMode>(10);
+  bats_config.cert_file = bats_default_cert_file;
+  bats_config.key_file = bats_default_key_file;
+
   ctrl_chn_listener_ = std::make_shared<BatsProtocol>(*io_, bats_config);
 
   std::unordered_map<std::string, int*> int_args_tbl;
@@ -510,6 +511,7 @@ void IperfBatsApi::EnterReceiverIntervalLoop() {
       test->TestFinishState();
       if (test->GetState() == TestState::TEST_DONE && test->IsStreamDone()) {
         spdlog::info("[IperfBatsApi] ROLE_RECEIVER is done. Test ID: {}", test->Id());
+        test->TryPrintSummary();
         dying_tests.emplace_back(test, 0);
         iter = test_tbl_.erase(iter);
       } else {
@@ -566,6 +568,7 @@ void IperfBatsApi::EnterSenderIntervalLoop() {
   }
 
   if (max_wait_time == 0 && iperf_test->IsStreamDone() == false) {
+    // Probably not all sent data were acked.
     spdlog::info("[IperfBatsApi] ROLE_SENDER is done with timeout on fin-ack. Test ID: {}", iperf_test->Id());
     iperf_test->PrintStreamSendSummary();
   } else {

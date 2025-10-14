@@ -52,15 +52,16 @@ bool IperfTest::Start() {
 
   // 1. start control channel.
   BatsConfiguration bats_config;
-  bats_config.SetTimeout(1000 * 1000);
+  bats_config.connection_timeout = 1000 * 1000;
+  bats_config.frame_type = BATSFrameType::BATS_HEADER_MIN;
   // default to TCP
-  bats_config.SetFrameType(FrameType::BATS_HEADER_MIN);
-  bats_config.SetCertFile(bats_default_cert_file);
-  bats_config.SetKeyFile(bats_default_key_file);
-  bats_config.SetMode(static_cast<TransMode>(10));
-  bats_config.SetRemoteAddr(test_config_.peer_host);
+  bats_config.transport_mode = static_cast<BATSTransMode>(10);
+  bats_config.cert_file = bats_default_cert_file;
+  bats_config.key_file = bats_default_key_file;
+  bats_config.remote_addr = test_config_.peer_host;
   // use the different port for control channel.
-  bats_config.SetRemotePort(test_config_.port - 1);
+  bats_config.remote_port = test_config_.port - 1;
+
   ctrl_chn_connector_ = std::make_shared<BatsProtocol>(io_, bats_config);
   ctrl_chn_connector_->StartConnect(
       std::bind(&IperfTest::ControlChannelConnectionCallback, this, std::placeholders::_1, std::placeholders::_2,
@@ -220,8 +221,6 @@ void IperfTest::HandleSummaryMessage(const struct iperf_control_data* control_he
   auto num_of_streams = control_header->num_of_streams;
   assert(control_header->test_id == test_id_);
   auto data = reinterpret_cast<const octet*>(control_header) + sizeof(struct iperf_control_data);
-  assert(printer_ != nullptr);
-  printer_->PrintRecvSummaryHeader();
   std::scoped_lock lock(streams_mutex_);
   for (int i = 0; i < num_of_streams; i++) {
     auto stream_identifier = *reinterpret_cast<const uint64_t*>(data);
@@ -231,12 +230,6 @@ void IperfTest::HandleSummaryMessage(const struct iperf_control_data* control_he
     for (auto& stream : test_streams_) {
       if (stream->GetSteamIdentifier() == stream_identifier) {
         data = stream->DeserializeReport(data);
-        // stop the receive stream.
-        spdlog::info("[IperfTest] Test stream {} report finished.", stream->Id());
-        stream->FinishReport();
-        stream->PrintReceiveSummary();
-        // received from clients. (DeserializeReport)
-        stream->PrintSendSummary();
       }
     }
   }
@@ -256,21 +249,22 @@ void IperfTest::HandleTestParameters(const struct iperf_control_data* control_he
   spdlog::info("[IperfTest] Test parameters received {}", ss.str());
 
   BatsConfiguration bats_config;
-  bats_config.SetTimeout(received_test_config.interval * received_test_config.time * 1000);
+  bats_config.cert_file = bats_default_cert_file;
+  bats_config.key_file = bats_default_key_file;
+  bats_config.connection_timeout = received_test_config.interval * received_test_config.time * 1000;
+  bats_config.transport_mode = static_cast<BATSTransMode>(received_test_config.protocol);
+
   if (received_test_config.protocol == 0 || received_test_config.protocol == 1) {
-    bats_config.SetFrameType(FrameType::BATS_HEADER_V1);
+    bats_config.frame_type = BATSFrameType::BATS_HEADER_V1;
   }
   // udp.quic
   if (received_test_config.protocol == 11 || received_test_config.protocol == 12) {
-    bats_config.SetFrameType(FrameType::TRANSPARENT);
+    bats_config.frame_type = BATSFrameType::TRANSPARENT;
   }
   // tcp
   if (received_test_config.protocol == 10) {
-    bats_config.SetFrameType(FrameType::BATS_HEADER_MIN);
+    bats_config.frame_type = BATSFrameType::BATS_HEADER_MIN;
   }
-  bats_config.SetCertFile(bats_default_cert_file);
-  bats_config.SetKeyFile(bats_default_key_file);
-  bats_config.SetMode(static_cast<TransMode>(received_test_config.protocol));
   data_chn_listener_ = std::make_shared<BatsProtocol>(io_, bats_config);
   received_test_config.resolution = test_config_.resolution;
   received_test_config.is_debug_mode = test_config_.is_debug_mode;
@@ -311,7 +305,7 @@ void IperfTest::SendTestSummary() {
     ptr = stream->SerializeReport(ptr);
   }
 
-  ctrl_chn_->SendData(iper_control_data.data(), iper_control_data.size());
+  ctrl_chn_->SendData(iper_control_data.data(), iper_control_data.size(), BatsSendFlag::BATS_SEND_FLAG_NONE);
   state_ = TestState::TEST_EXCHANGE_REPORTS;
   spdlog::info("[IperfTest] Testing summary is sent.");
 }
@@ -333,7 +327,7 @@ bool IperfTest::SendTestParameters() {
   // body (Serialize)
   ptr = test_config_.Serialize(ptr);
 
-  ctrl_chn_->SendData(iper_control_data.data(), iper_control_data.size());
+  ctrl_chn_->SendData(iper_control_data.data(), iper_control_data.size(), BatsSendFlag::BATS_SEND_FLAG_NONE);
   spdlog::info("[IperfTest] Test parameters are sent.");
   state_ = TestState::TEST_EXCHANGE_PARAMETERS;
   return true;
@@ -349,7 +343,7 @@ bool IperfTest::SendAck() {
   control_header->magic = bats_iperf_magic_code;
   control_header->action_code = 0x04;
 
-  ctrl_chn_->SendData(iper_control_data.data(), iper_control_data.size());
+  ctrl_chn_->SendData(iper_control_data.data(), iper_control_data.size(), BatsSendFlag::BATS_SEND_FLAG_NONE);
   spdlog::info("[IperfTest] Test ack is sent.");
   // For RECEIVER
   if (state_ == TestState::TEST_NONE) {
@@ -381,12 +375,25 @@ bool IperfTest::IsStreamReady() {
 }
 
 void IperfTest::PrintStreamSendSummary() {
+  if (test_config_.role != TestRole::ROLE_SENDER) {
+    return;
+  }
   std::scoped_lock lock(streams_mutex_);
   for (auto& stream : test_streams_) {
-    if (test_config_.role != TestRole::ROLE_SENDER) {
-      continue;
-    }
     stream->PrintSendSummary();
+  }
+}
+
+/// @brief Try to print the summary at server side when the test is done.
+void IperfTest::TryPrintSummary() {
+  if (test_config_.role != TestRole::ROLE_RECEIVER) {
+    return;
+  }
+  assert(printer_ != nullptr);
+  printer_->PrintRecvSummaryHeader();
+  std::scoped_lock lock(streams_mutex_);
+  for (auto& stream : test_streams_) {
+    stream->PrintSendRecvSummary();
   }
 }
 

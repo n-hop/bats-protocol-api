@@ -64,6 +64,7 @@ class IIperfTest {
   void SetBoundInf(const std::string& interface_name) { interface_name_ = interface_name; }
   void SetPrinter(IPrinter* printer) { printer_ = printer; }
   void SetRole(const TestRole& role) { test_config_.role = role; }
+  virtual void TryPrintSummary() = 0;
 
   virtual void PrintStreamSendSummary() = 0;
   virtual void HandleControlMessage(const IBatsConnPtr& ctrl_conn, const octet* data, int length) = 0;

@@ -89,15 +89,15 @@ std::string RoleString(const TestRole& role) {
 
 bool IsSupportedProtocol(int protocol) {
   /*
-  if (static_cast<TransMode>(protocol) < TransMode::BTP || static_cast<TransMode>(protocol) > TransMode::TRANSPARENT) {
-    return false;
+  if (static_cast<BATSTransMode>(protocol) < BATSTransMode::BTP || static_cast<BATSTransMode>(protocol) >
+  BATSTransMode::TRANSPARENT) { return false;
   }*/
   return true;
 }
 
 bool IsReliableProtocol(int protocol) {
-  if (static_cast<TransMode>(protocol) == TransMode::BRTP || static_cast<TransMode>(protocol) == TransMode::BRCTP ||
-      protocol == 10) {
+  if (static_cast<BATSTransMode>(protocol) == BATSTransMode::BRTP ||
+      static_cast<BATSTransMode>(protocol) == BATSTransMode::BRCTP || protocol == 10) {
     return true;
   }
   return false;

@@ -24,7 +24,7 @@ static int stop_signal_value(0);
 
 class BATSSender {
  public:
-  BATSSender(BatsProtocol& protocol, int send_cnt, TransMode mode)
+  BATSSender(BatsProtocol& protocol, int send_cnt, BATSTransMode mode)
       : protocol_(protocol), send_quota(send_cnt), bats_mode_(mode) {
     send_data.resize(default_buffer_max_sz);
     send_data.assign(default_buffer_max_sz, 0x0f);
@@ -109,7 +109,8 @@ class BATSSender {
         continue;
       }
       // keep sending.
-      if (bats_connection->SendData(reinterpret_cast<const octet*>(send_data.data()), cur_ideal_length) == false) {
+      if (bats_connection->SendData(reinterpret_cast<const octet*>(send_data.data()), cur_ideal_length,
+                                    BatsSendFlag::BATS_SEND_FLAG_NONE) == false) {
         // not a successful sending due to many possible reasons.
         continue;
       }
@@ -142,7 +143,7 @@ class BATSSender {
   std::atomic<bool> is_connected = {false};
   std::atomic<bool> is_writable = {false};
   IBatsConnPtr bats_connection = nullptr;
-  TransMode bats_mode_ = TransMode::BTP;
+  BATSTransMode bats_mode_ = BATSTransMode::BTP;
 };
 int main(int argc, char* argv[]) {
   int mode = 0;
@@ -158,10 +159,12 @@ int main(int argc, char* argv[]) {
   io.SetBATSLogLevel(BATSLogLevel::LOG_WARN);
   io.SetSignalCallback([](int sig) { stop_signal_value = sig; });
   BatsConfiguration config;
-  config.SetMode(static_cast<TransMode>(mode));  // default to BTP
-  config.SetTimeout(2000);                       // 2000ms
+
+  config.transport_mode = static_cast<BATSTransMode>(mode);  // default to BRTP
+  config.connection_timeout = 2000;
+
   BatsProtocol protocol(io, config);
-  BATSSender bats_sender(protocol, send_cnt, static_cast<TransMode>(mode));
+  BATSSender bats_sender(protocol, send_cnt, static_cast<BATSTransMode>(mode));
 
   bats_sender.StartConnect();
   bats_sender.StartSend();

@@ -10,12 +10,56 @@
  */
 #ifndef INCLUDE_CPP_BATS_CONNECTION_H_
 #define INCLUDE_CPP_BATS_CONNECTION_H_
-
 #include <functional>
 #include <memory>
 #include <string>
+#include <vector>
 
-#include "bats_config.h"
+#include "include/cpp/bats_config.h"
+
+using octet = unsigned char;
+using octetVec = std::vector<octet>;
+using octVecIter = std::vector<octet>::iterator;
+using octVecConstIter = std::vector<octet>::const_iterator;
+
+enum class BatsListenEvent : uint8_t {
+  BATS_LISTEN_NONE = 0,
+  BATS_LISTEN_NEW_CONNECTION,     // new connection is accepted.
+  BATS_LISTEN_FAILED,             // failed to do listen.
+  BATS_LISTEN_SUCCESS,            // listen success.
+  BATS_LISTEN_ACCEPTED_ERROR,     // accepted connection error.
+  BATS_LISTEN_ALREADY_IN_LISTEN,  // already in listen state.
+  BATS_LISTEN_STOPPED,            // listen stopped.
+};
+
+///
+/// @brief IOContext will emit those events when the state of the connection changes.
+///
+/// Within one BatsConnection,thecallback is thread-safe.
+///
+enum class BatsConnEvent : uint8_t {
+  BATS_CONNECTION_NONE = 0,
+  BATS_CONNECTION_FAILED,               // conenction failed.
+  BATS_CONNECTION_ESTABLISHED,          // connection established.
+  BATS_CONNECTION_TIMEOUT,              // connection timeout in 2s.
+  BATS_CONNECTION_SHUTDOWN_BY_PEER,     // connection shutdown by peer.
+  BATS_CONNECTION_WRITABLE,             // connection writable, ready to send data.
+  BATS_CONNECTION_DATA_RECEIVED,        // connections has received data from peer.
+  BATS_CONNECTION_SEND_COMPLETE,        // connection sent last data complete.
+  BATS_CONNECTION_SEND_DATA_ERROR,      // error when sending data.
+  BATS_CONNECTION_BUFFER_FULL,          // unable to write since the buffer of this connection is full.
+  BATS_CONNECTION_CLOSED,               // connection closed.
+  BATS_CONNECTION_ERROR,                // some errors in current connection
+  BATS_CONNECTION_ALREADY_CONNECTED,    // connection already established.
+  BATS_CONNECTION_IDEAL_BUFFER_LENGTH,  // update it's ideal buffer length when underlying MSS is changed.
+  BATS_CONNECTION_ALL_DATA_ACKED,  // send the notification when all the sent data has been acked by peers (valid for
+                                   // BRTP).
+};
+
+enum class BatsSendFlag : uint8_t {
+  BATS_SEND_FLAG_NONE = 0,
+  BATS_SEND_FLAG_FIN = 0x01,  // indicate this is the last data to be sent of current connection.
+};
 
 class IBatsConnection;
 using IBatsConnPtr = std::shared_ptr<IBatsConnection>;
@@ -44,8 +88,8 @@ class IBatsConnection {
   ///           2. The connection is not writable (user buffer is full).
   ///           3. The connection is not ready (not connected/established).
   ///
-  virtual bool SendData(const octetVec& data) = 0;
-  virtual bool SendData(const octet* data, int length) = 0;
+  virtual bool SendData(const octetVec& data, BatsSendFlag flags) = 0;
+  virtual bool SendData(const octet* data, int length, BatsSendFlag flags) = 0;
 
   ///
   /// @brief Send a file to the network.
@@ -63,15 +107,11 @@ class IBatsConnection {
   ///
   virtual bool IsWritable() = 0;
 
-  /// @brief Get information about the connection.
-  virtual const std::string GetRemoteAddress() const = 0;
-  virtual const std::string GetLocalAddress() const = 0;
-  virtual uint16_t GetRemotePort() const = 0;
-  virtual uint16_t GetLocalPort() const = 0;
-
   /// @brief Get the ideal buffer length for the SendData function to send data efficiently.
   /// @return
   virtual uint32_t GetIdealBufferLength() const = 0;
+
+  virtual const BatsConfiguration& GetConf() const = 0;
 };
 
 #endif  // INCLUDE_CPP_BATS_CONNECTION_H_

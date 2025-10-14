@@ -63,33 +63,16 @@ class IperfStream : public std::enable_shared_from_this<IperfStream> {
   bool operator<(const IperfStream& other) const { return Id() < other.Id(); }
 
   void PrintLastInterval();
-  void PrintReceiveSummary();
+  void PrintSendRecvSummary();
   void PrintSendSummary();
   StreamState GetState() const { return state_.load(); }
   octet* SerializeReport(octet* to_buffer);
   const octet* DeserializeReport(const octet* from_buffer);
   bool IsIntervalDataReceivedTimeout();
   bool SnapshotReport();
+  void FinishReport();
+
   bool IsConnected() { return conn_state_ == ConnectionState::CONN_CONNECTED; }
-  void FinishReport() {
-    if (config_.role == TestRole::ROLE_SENDER) {
-      // actually expect to be in `STREAM_START` when do FinishReport
-      // for sender: (D)  Time is up -> stop send -> FIN -> FIN-ACK -> STREAM_DONE -> print summary.
-      // for sender: (C)  Time is up -> gen summary(FinishReport-> stop send) -> send summary
-      if (state_ == StreamState::STREAM_DONE) {
-        spdlog::warn("[IperfStream] FinishReport can't be called on state STREAM_DONE.");
-        return;
-      }
-      state_ = StreamState::STREAM_STOP;
-      this->GenSendSummary();
-    }
-    if (config_.role == TestRole::ROLE_RECEIVER) {
-      // for receiver: (D)  FIN -> FIN-ACK -> STREAM_DONE
-      // for receiver: (C)  receive summary -> gen summary(FinishReport)
-      state_ = StreamState::STREAM_STOP;
-      this->GenReceiveSummary();
-    }
-  }
   /// @brief Stop the stream; may be called by multiple threads.
   void Stop() {
     if (is_stopped_.exchange(true)) {
@@ -114,6 +97,7 @@ class IperfStream : public std::enable_shared_from_this<IperfStream> {
   bool IsFinAcked() const { return is_fin_acked_.load(); }
 
  protected:
+  void PrintReceiveSummary();
   octet* SerializeInterval(octet* to_buffer, const TestInterval& inter);
   TestInterval DeserializeInterval(const octet* from_buffer);
   bool UpdateReceived(const octet* data, int length);
@@ -139,6 +123,9 @@ class IperfStream : public std::enable_shared_from_this<IperfStream> {
   std::thread sending_thread_;
   // read stream id from `iperf_test_header`
   uint64_t stream_identifier_ = 0;
+  /// @brief Whether the summary from the peer is received.
+  std::atomic<bool> is_sum_printed_ = false;
+  std::atomic<bool> is_sum_received_ = false;
   std::atomic<bool> is_fin_received_ = false;
   std::atomic<bool> is_fin_acked_ = false;
   std::atomic<bool> is_writable_ = false;
