@@ -79,6 +79,9 @@ bool IperfTest::Stop() {
   for (auto& stream : test_streams_) {
     stream->Stop();
   }
+  // before release all the streams, try to print something.
+  // this happens when the peer is down unexpectedly or too early.
+  TryPrintSummary();
   std::list<IperfStreamPtr>().swap(test_streams_);
   return true;
 }
@@ -112,10 +115,15 @@ void IperfTest::DataListenCallback(const IBatsConnPtr& data_conn, const BatsList
         auto copied_config = test_config_;
         copied_config.role = TestRole::ROLE_RECEIVER;  // receiver role.
         auto data_stream = std::make_shared<IperfStream>(io_, log_stream_, copied_config, data_conn);
-        data_stream->Start();  // just set callback.
+        data_stream->StartRecv();  // just set callback.
         {
           std::scoped_lock lock(streams_mutex_);
           test_streams_.push_back(data_stream);
+        }
+        if (test_config_.protocol != 11 && test_config_.num_streams == test_streams_.size()) {
+          // UDP simulates the accept with the first packet.
+          spdlog::info("[IperfTest] All data streams are connected.");
+          SendTestReady();
         }
       }
       break;
@@ -184,8 +192,25 @@ void IperfTest::HandleControlMessage(const IBatsConnPtr& ctrl_conn, const octet*
       spdlog::info("[IperfTest] Testing parameters are received.");
       HandleTestParameters(control_header);
       break;
-    default:
+    case 0x05:
+      spdlog::info("[IperfTest] ============ Testing ready signal is received.");
+      HandleReadyMessage(control_header);
       break;
+    default:
+      spdlog::warn("[IperfTest] Unknown control message received, action code: {}",
+                   static_cast<int>(control_header->action_code));
+      break;
+  }
+}
+
+void IperfTest::HandleReadyMessage([[maybe_unused]] const struct iperf_control_data* control_header) {
+  is_ready_received_ = true;
+  if (state_ == TestState::TEST_START) {
+    assert(printer_ != nullptr);
+    printer_->PrintSentSummaryHeader();
+    for (auto& stream : test_streams_) {
+      stream->StartSend();
+    }
   }
 }
 
@@ -196,11 +221,13 @@ void IperfTest::HandleAckMessage([[maybe_unused]] const struct iperf_control_dat
   if (state_ == TestState::TEST_EXCHANGE_PARAMETERS) {
     state_ = TestState::TEST_START;
     spdlog::info("[IperfTest] Test ack is received. start test streams.");
-    assert(printer_ != nullptr);
-    printer_->PrintSentSummaryHeader();
     for (int i = 0; i < test_config_.num_streams; ++i) {
       auto stream = std::make_shared<IperfStream>(io_, log_stream_, test_config_);
-      stream->Start();
+      stream->StartConnect();
+      if (test_config_.protocol == 11) {
+        // no need to wait when it's UDP.
+        stream->StartSend();
+      }
       test_streams_.push_back(stream);
     }
     return;
@@ -221,19 +248,31 @@ void IperfTest::HandleSummaryMessage(const struct iperf_control_data* control_he
   auto num_of_streams = control_header->num_of_streams;
   assert(control_header->test_id == test_id_);
   auto data = reinterpret_cast<const octet*>(control_header) + sizeof(struct iperf_control_data);
-  std::scoped_lock lock(streams_mutex_);
-  for (int i = 0; i < num_of_streams; i++) {
-    auto stream_identifier = *reinterpret_cast<const uint64_t*>(data);
-    // offset the stream_identifier
-    data += sizeof(uint64_t);
-    // match stream via identifier; low efficiency(num_of_streams^2) but doesn't matter.
-    for (auto& stream : test_streams_) {
-      if (stream->GetSteamIdentifier() == stream_identifier) {
-        data = stream->DeserializeReport(data);
+  {
+    std::scoped_lock lock(streams_mutex_);
+    for (int i = 0; i < num_of_streams; i++) {
+      auto stream_identifier = *reinterpret_cast<const uint64_t*>(data);
+      // offset the stream_identifier
+      data += sizeof(uint64_t);
+      // match stream via identifier; low efficiency(num_of_streams^2) but doesn't matter.
+      for (auto& stream : test_streams_) {
+        if (stream->GetStreamIdentifier() == stream_identifier) {
+          data = stream->DeserializeReport(data);
+          if (IsReliableProtocol(test_config_.protocol) == false) {
+            // FIN/ACK can be lost in unreliable protocol like UDP.
+            stream->FinishReport();
+          }
+        }
       }
     }
   }
+
   SendAck();
+
+  if (IsReliableProtocol(test_config_.protocol) == false) {
+    // protocol like UDP should print the summary immediately when SUM is received.
+    this->TryPrintSummary();
+  }
 }
 
 void IperfTest::HandleTestParameters(const struct iperf_control_data* control_header) {
@@ -362,6 +401,26 @@ bool IperfTest::SendAck() {
   return true;
 }
 
+/// @brief Send a signal to iperf clients to indicate all the test streams are ready(accepted).
+bool IperfTest::SendTestReady() {
+  if (ctrl_chn_ == nullptr) {
+    spdlog::info("[IperfTest] no control channel. unable to send test ready signal.");
+    return false;
+  }
+  octetVec iper_control_data;
+  iper_control_data.resize(300);
+  octet* ptr = iper_control_data.data();
+  // header
+  iperf_control_data* control_header = reinterpret_cast<iperf_control_data*>(ptr);
+  control_header->test_id = Id();
+  control_header->magic = bats_iperf_magic_code;
+  control_header->action_code = 0x05;
+
+  ctrl_chn_->SendData(iper_control_data.data(), iper_control_data.size(), BatsSendFlag::BATS_SEND_FLAG_NONE);
+  spdlog::info("[IperfTest] Test ready signal is sent.");
+  return true;
+}
+
 bool IperfTest::IsStreamReady() {
   std::scoped_lock lock(streams_mutex_);
   auto expected_num_streams = test_config_.num_streams;
@@ -371,11 +430,15 @@ bool IperfTest::IsStreamReady() {
     }
     expected_num_streams--;
   }
-  return expected_num_streams == 0;
+  return is_ready_received_ = true && expected_num_streams == 0;
 }
 
 void IperfTest::PrintStreamSendSummary() {
   if (test_config_.role != TestRole::ROLE_SENDER) {
+    return;
+  }
+  if (IsReliableProtocol(test_config_.protocol) == false) {
+    // protocol like UDP print the summary when Fin was sent.
     return;
   }
   std::scoped_lock lock(streams_mutex_);
@@ -387,6 +450,7 @@ void IperfTest::PrintStreamSendSummary() {
 /// @brief Try to print the summary at server side when the test is done.
 void IperfTest::TryPrintSummary() {
   if (test_config_.role != TestRole::ROLE_RECEIVER) {
+    spdlog::warn("[IperfTest] Only receiver can print the recv summary.");
     return;
   }
   assert(printer_ != nullptr);

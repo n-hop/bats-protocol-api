@@ -37,7 +37,7 @@ enum class TestState {
 struct iperf_control_data {
   uint64_t magic;
   uint32_t test_id;
-  // 01 setup/request, 02 exchange, 03 test results. 04 ack.
+  // 01 setup/request, 02 exchange, 03 test results. 04 ack. 05 established/ready.
   uint8_t action_code;
   uint8_t num_of_streams;
   uint32_t param0;  // num. of files; response code(0 accepted, 1 denied).

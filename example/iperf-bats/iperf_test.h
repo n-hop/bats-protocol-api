@@ -123,17 +123,20 @@ class IperfTest : public IIperfTest {
 
   void SendTestSummary();
   bool SendTestParameters();
+  bool SendTestReady();
   bool SendAck();
   void HandleAckMessage(const struct iperf_control_data* control_header);
+  void HandleReadyMessage(const struct iperf_control_data* control_header);
   void HandleSummaryMessage(const struct iperf_control_data* control_header);
   void HandleTestParameters(const struct iperf_control_data* control_header);
   /// @brief Check whether expected interval data is received.
   void CheckStreamIntervalReceive();
 
  private:
+  std::mutex streams_mutex_;
+  std::atomic<bool> is_ready_received_ = false;
   BatsProtocolPtr data_chn_listener_ = nullptr;
   BatsProtocolPtr ctrl_chn_connector_ = nullptr;
-  std::mutex streams_mutex_;
   std::list<IperfStreamPtr> test_streams_;
   int passed_ticks_ = 0;
 };

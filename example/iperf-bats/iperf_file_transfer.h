@@ -116,11 +116,11 @@ class IperfFileTransfer : public IIperfTest, public std::enable_shared_from_this
   void ReadFileNames(const void* file_meta, std::string& name, std::string& ext);
   void WriteFileSha256(const std::string sha256_file_name, const void* file_meta);
   static constexpr int max_decompressed_buf_sz = 300000;
-  std::vector<octet> decompressed_buf;
 
+  std::mutex streams_mutex_;
+  std::vector<octet> decompressed_buf;
   BatsProtocolPtr data_chn_listener_ = nullptr;
   BatsProtocolPtr data_chn_connector_ = nullptr;
-  std::mutex streams_mutex_;
   std::vector<FileStreamPtr> streams_;
   FileQueue pending_files_;
   CompoundProgressBar shared_cprog_;

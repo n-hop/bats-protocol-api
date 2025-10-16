@@ -395,6 +395,7 @@ std::stringstream IperfStream::PrintSendLastInterval() {
 
 void IperfStream::PrintSendRecvSummary() {
   if (is_sum_printed_.exchange(true)) {
+    spdlog::warn("[IperfStream] Test stream {} summary has been printed.", this->Id());
     return;
   }
   this->PrintReceiveSummary();
@@ -404,6 +405,7 @@ void IperfStream::PrintSendRecvSummary() {
 void IperfStream::PrintReceiveSummary() {
   auto ss = PrintSummary(report_.receiver_report.summary, "receiver", report_.stream_id);
   std::cout << ss.str();
+  spdlog::info("bats_iperf {}", ss.str());
   if (log_stream_.is_open()) {
     log_stream_ << ss.str();
     log_stream_ << std::flush;
@@ -413,6 +415,7 @@ void IperfStream::PrintReceiveSummary() {
 void IperfStream::PrintSendSummary() {
   auto ss = PrintSummary(report_.sender_report.summary, "sender", report_.stream_id);
   std::cout << ss.str();
+  spdlog::info("bats_iperf {}", ss.str());
   if (log_stream_.is_open()) {
     log_stream_ << ss.str();
     log_stream_ << std::flush;
@@ -471,6 +474,16 @@ bool IperfStream::ValidateReceivedData(const octet* data, int length) {
         "[IperfStream] Test stream {} received data corruption at the end of data, length {}; char diff {:x} vs {:x}",
         this->Id(), length, data[length - 1], iperf_char);
     return false;
+  }
+
+  constexpr static int link_mtu = 1500;
+  if (length > link_mtu + static_cast<int>(sizeof(iperf_test_header) + IntervalDataSize)) {
+    if (data[length - 1 - link_mtu] != iperf_char) {
+      spdlog::error(
+          "[IperfStream] Test stream {} received data corruption at the mid of data, length {}; char diff {:x} vs {:x}",
+          this->Id(), length, data[length - 1 - link_mtu], iperf_char);
+      return false;
+    }
   }
   return true;
 }
@@ -548,22 +561,15 @@ bool IperfStream::UpdateReceived(const octet* data, int length) {
   return true;
 }
 
-bool IperfStream::ConnectionCallback(const IBatsConnPtr& new_conn, const BatsConnEvent& event, const octet* data,
+bool IperfStream::ConnectionCallback(const IBatsConnPtr& bats_conn, const BatsConnEvent& event, const octet* data,
                                      int length, void* user) {
   switch (event) {
     case BatsConnEvent::BATS_CONNECTION_ESTABLISHED:
       if (config_.role == TestRole::ROLE_SENDER) {
         spdlog::info("[IperfStream] Test stream {} connection established!", this->Id());
         conn_state_ = ConnectionState::CONN_CONNECTED;
-        data_conn_ = new_conn;
-
+        data_conn_ = bats_conn;
         this->SwitchDataBlockLength(data_conn_->GetIdealBufferLength());
-        // start snapshot immediately when data connection is established.
-        std::unique_lock<std::mutex> lock(snapshot_mutex_);
-        auto& sender_report = report_.sender_report;
-        if (sender_report.summary.bytes == 0 && sender_report.last_snapshot_time == 0) {
-          sender_report.last_snapshot_time = get_time_in_ms<ClockType::MONOTONIC>();
-        }
       }
       break;
     case BatsConnEvent::BATS_CONNECTION_CLOSED:
@@ -591,6 +597,17 @@ bool IperfStream::ConnectionCallback(const IBatsConnPtr& new_conn, const BatsCon
     case BatsConnEvent::BATS_CONNECTION_ALL_DATA_ACKED:
       // to confirm all sent data were acked.
       break;
+    case BatsConnEvent::BATS_CONNECTION_FAILED:
+    case BatsConnEvent::BATS_CONNECTION_TIMEOUT:
+      spdlog::warn("[IperfStream] Test stream {} connection timeout or failed!", this->Id());
+      if (connect_retry_cnt_ < max_connect_retry) {
+        // stop the old connection if any.
+        connector_->StopConnection(bats_conn);
+        // try to reconnect
+        this->StartConnect();
+        connect_retry_cnt_++;
+      }
+      break;
     case BatsConnEvent::BATS_CONNECTION_DATA_RECEIVED:
       // to receive any acks.
       // @note: return true if data is copied or processed.
@@ -599,47 +616,63 @@ bool IperfStream::ConnectionCallback(const IBatsConnPtr& new_conn, const BatsCon
   return true;
 }
 
-void IperfStream::Start() {
+/// @brief Stop the stream; may be called by multiple threads.
+void IperfStream::Stop() {
+  if (is_stopped_.exchange(true)) {
+    return;
+  }
+
+  if (config_.role == TestRole::ROLE_RECEIVER && !is_fin_received_) {
+    // Fin is lost and peer shutdown the connection.
+    this->FinishReport();
+    if (IsReliableProtocol(config_.protocol)) {
+      spdlog::warn("[IperfStream] Test stream {} FIN is not received, not the expected results", this->Id());
+    }
+  }
+
+  state_ = StreamState::STREAM_DONE;
+  conn_state_ = ConnectionState::CONN_DISCONNECTED;
+  if (connector_) {
+    connector_->StopConnection(data_conn_);
+  }
+  // eliminate circular reference (connector_ and `data_conn_` hold the shared_from_this)
+  data_conn_ = nullptr;
+  connector_ = nullptr;
+}
+
+void IperfStream::StartConnect() {
+  assert(connector_ != nullptr);
+  using namespace std::placeholders;  // NOLINT
+  conn_state_ = ConnectionState::CONN_CONNECTING;
+  connector_->StartConnect(config_.peer_host, config_.port,
+                           std::bind(&IperfStream::ConnectionCallback, shared_from_this(), _1, _2, _3, _4, _5),
+                           nullptr);
+  spdlog::info("[IperfStream] Test stream {} connecting to {}:{}", this->Id(), config_.peer_host, config_.port);
+}
+
+void IperfStream::StartRecv() {
   if (config_.role == TestRole::ROLE_RECEIVER) {
     using namespace std::placeholders;  // NOLINT
     data_conn_->SetConnectionCallback(
         std::bind(&IperfStream::ConnectionCallback, shared_from_this(), _1, _2, _3, _4, _5), nullptr);
     return;
   }
-  assert(connector_ != nullptr);
+}
 
+void IperfStream::StartSend() {
+  // start snapshot upon received the ready signal from peer.
+  std::unique_lock<std::mutex> lock(snapshot_mutex_);
+  auto& sender_report = report_.sender_report;
+  if (sender_report.summary.bytes == 0 && sender_report.last_snapshot_time == 0) {
+    sender_report.last_snapshot_time = get_time_in_ms<ClockType::MONOTONIC>();
+  }
   state_ = StreamState::STREAM_START;
   sending_thread_ = std::thread([this]() {
-    int retry_cnt = 0;
-    while (IsConnected() == false && state_ == StreamState::STREAM_START) {
-      using namespace std::placeholders;  // NOLINT
-      conn_state_ = ConnectionState::CONN_CONNECTING;
-      connector_->StartConnect(config_.peer_host, config_.port,
-                               std::bind(&IperfStream::ConnectionCallback, shared_from_this(), _1, _2, _3, _4, _5),
-                               nullptr);
-      spdlog::info("[IperfStream] Test stream {} connecting to {}:{}", this->Id(), config_.peer_host, config_.port);
-      int wait_cnt = 0;
-      while (IsConnecting() && wait_cnt < 5000) {  // max wait 10s
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        wait_cnt++;
-      }
-      if (IsConnected() == false) {
-        spdlog::info("[IperfStream] Test stream {} connection failed, retrying...", this->Id());
-        retry_cnt++;
-      }
-      if (retry_cnt > 3) {
-        spdlog::error("[IperfStream] Test stream {} connection failed after {} retries, giving up.", this->Id(),
-                      retry_cnt);
-        break;
-      }
-    }
-
     if (IsConnected() == false) {
-      spdlog::info("[IperfStream] Failed to connect to the server, test failed.", this->Id());
+      spdlog::info("[IperfStream] Data stream is not connected, stop sending.");
       this->Stop();
       return;
     }
-
     spdlog::info("[IperfStream] Test stream {} sending thread is started.", this->Id());
     bool last_grp_id = false;
     while (IsConnected() && state_ == StreamState::STREAM_START) {
@@ -883,6 +916,7 @@ void IperfStream::OnReceivedIntervalData(const octet* data, int length) {
                 << (last_test_interval.lost_datagrams) << "/" << last_test_interval.datagrams << " (" << std::fixed
                 << std::setprecision(1) << last_test_interval.loss * 100 << "%)" << '\n';
     std::cout << ss_interval.str();
+    spdlog::info("bats_iperf {}", ss_interval.str());
     if (log_stream_.is_open()) {
       log_stream_ << ss_interval.str();
       log_stream_ << std::flush;

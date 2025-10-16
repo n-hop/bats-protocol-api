@@ -73,24 +73,13 @@ class IperfStream : public std::enable_shared_from_this<IperfStream> {
   void FinishReport();
 
   bool IsConnected() { return conn_state_ == ConnectionState::CONN_CONNECTED; }
-  /// @brief Stop the stream; may be called by multiple threads.
-  void Stop() {
-    if (is_stopped_.exchange(true)) {
-      return;
-    }
-    state_ = StreamState::STREAM_DONE;
-    conn_state_ = ConnectionState::CONN_DISCONNECTED;
-    if (connector_) {
-      connector_->StopConnection(data_conn_);
-    }
-    // eliminate circular reference (connector_ and `data_conn_` hold the shared_from_this)
-    data_conn_ = nullptr;
-    connector_ = nullptr;
-  }
 
-  void Start();
+  void Stop();
+  void StartConnect();
+  void StartSend();
+  void StartRecv();
   int Id() const { return report_.stream_id; }
-  uint64_t GetSteamIdentifier() { return stream_identifier_; }
+  uint64_t GetStreamIdentifier() { return stream_identifier_; }
   bool ConnectionCallback(const IBatsConnPtr& new_conn, const BatsConnEvent& event, const octet* data, int length,
                           void* user);
   bool IsFinReceived() const { return is_fin_received_.load(); }
@@ -115,11 +104,12 @@ class IperfStream : public std::enable_shared_from_this<IperfStream> {
   void OnReceivedFIN();
   void OnReceivedIntervalData(const octet* data, int length);
   bool ValidateReceivedData(const octet* data, int length);
+  static constexpr int max_connect_retry = 3;
 
   IOContext& io_;
   std::basic_ofstream<char>& log_stream_;
+  std::mutex snapshot_mutex_;
   TestConfig config_;
-
   std::thread sending_thread_;
   // read stream id from `iperf_test_header`
   uint64_t stream_identifier_ = 0;
@@ -134,8 +124,8 @@ class IperfStream : public std::enable_shared_from_this<IperfStream> {
   std::atomic<ConnectionState> conn_state_ = ConnectionState::CONN_NONE;
   std::atomic<StreamState> state_ = {StreamState::STREAM_NONE};
   BatsProtocolPtr connector_ = nullptr;
+  int connect_retry_cnt_ = 0;
 
-  std::mutex snapshot_mutex_;
   TestReportOfStream report_;
   IBatsConnPtr data_conn_ = nullptr;
   octetVec iperf_data_;  // data a;
