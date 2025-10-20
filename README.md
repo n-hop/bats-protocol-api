@@ -71,14 +71,25 @@ About file transfer mode, check details in [bats_iperf file transfer mode](examp
 
 ## Performance matrix of BRTP
 
-| Loss Rate/Latency | 10ms        | 30ms        | 50ms        | 70ms        | 100ms       |
-| ----------------- | ----------- | ----------- | ----------- | ----------- | ----------- |
-| 0.0%              | 949.5 Mbps  | 940.1 Mbps  | 927.81 Mbps | 979.71 Mbps | 928.81 Mbps |
-| 2.0%              | 888.33 Mbps | 907.4 Mbps  | 757.49 Mbps | 719.43 Mbps | 484.99 Mbps |
-| 4.0%              | 879.99 Mbps | 811.36 Mbps | 683.54 Mbps | 485.85 Mbps | 573.06 Mbps |
-| 6.0%              | 853.18 Mbps | 762.74 Mbps | 662.22 Mbps | 540.73 Mbps | 495.30 Mbps |
-| 8.0%              | 800.47 Mbps | 720.81 Mbps | 555.95 Mbps | 430.73 Mbps | 428.17 Mbps |
-| 10.0%             | 786.96 Mbps | 759.27 Mbps | 510.21 Mbps | 455.38 Mbps | 382.22 Mbps |
+| Loss Rate/Latency | 10ms        | 30ms        | 50ms        | 70ms        |
+| ----------------- | ----------- | ----------- | ----------- | ----------- |
+| 0.0%              | 945.11 Mbps | 942.11 Mbps | 914.04 Mbps | 906.65 Mbps |
+| 2.0%              | 882.52 Mbps | 850.11 Mbps | 752.79 Mbps | 684.26 Mbps |
+| 4.0%              | 845.58 Mbps | 789.7 Mbps  | 642.22 Mbps | 552.66 Mbps |
+| 6.0%              | 814.33 Mbps | 710.37 Mbps | 575.1 Mbps  | 507.45 Mbps |
+| 8.0%              | 770.33 Mbps | 648.42 Mbps | 476.61 Mbps | 416.53 Mbps |
+| 10.0%             | 742.6 Mbps  | 633.48 Mbps | 490.93 Mbps | 442.5 Mbps  |
+| 12.0%             | 714.55 Mbps | 598.98 Mbps | 434.38 Mbps | 307.49 Mbps |
+| 14.0%             | 678.14 Mbps | 539.92 Mbps | 435.92 Mbps | 335.26 Mbps |
+| 16.0%             | 663.26 Mbps | 519.42 Mbps | 413.81 Mbps | 261.82 Mbps |
+| 18.0%             | 633.87 Mbps | 500.64 Mbps | 377.29 Mbps | 300.51 Mbps |
+| 20.0%             | 639.5 Mbps  | 453.81 Mbps | 345.74 Mbps | 268.88 Mbps |
+
+> [!tip] Definitions and abbreviations
+> - 1. All tests were tested with the fixed Bandwidth 1000Mbps
+> - 2. Latency: the one-way delay of the link. RTT = 2 * OneWayDelay.
+> - 3. Data format in the cell: <br>[Delivery rate]
+>    - Delivery rate: The average receiving rate during the test.
 
 > [!TIP] 
 > Definitions and abbreviations
