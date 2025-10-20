@@ -85,21 +85,11 @@ About file transfer mode, check details in [bats_iperf file transfer mode](examp
 | 18.0%             | 633.87 Mbps | 500.64 Mbps | 377.29 Mbps | 300.51 Mbps |
 | 20.0%             | 639.5 Mbps  | 453.81 Mbps | 345.74 Mbps | 268.88 Mbps |
 
-> [!tip] Definitions and abbreviations
+> [!TIP] Definitions and abbreviations
 > - 1. All tests were tested with the fixed Bandwidth 1000Mbps
 > - 2. Latency: the one-way delay of the link. RTT = 2 * OneWayDelay.
 > - 3. Data format in the cell: <br>[Delivery rate]
 >    - Delivery rate: The average receiving rate during the test.
-
-> [!TIP] 
-> Definitions and abbreviations
-> - 1. All tests were tested with the fixed Bandwidth 1000Mbps
-> - 2. Latency: the one-way delay of the link/path.
-> - 3. Loss Rate: the packet loss takes effect on the bidirection of the link/path.
-> - 4. Data format in the cell: <br>[Delivery rate]
->    - Delivery rate: The average receiving rate during the test.
-> - 5. Latency and Loss Rate are simulated in [Oasis](https://github.com/n-hop/oasis/blob/main/docs/tc-strategy.md).
->
 
 ## Performance matrix of TCP BBR
 
