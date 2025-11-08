@@ -88,7 +88,7 @@ void IperfStream::SnapshotRxTxReport(TestReport& report, uint64_t current, uint6
 }
 
 // Test data layout:
-// | iperf_test_header | last interval data |
+// | iperf_test_header(35) | last interval data (32) |
 struct iperf_test_header {
   uint64_t magic;
   uint64_t stream_identifier;
@@ -108,7 +108,7 @@ struct iperf_test_header {
   uint8_t grp_id : 1;
 #endif
   uint16_t interval_id;
-};
+} __attribute__((__packed__));
 
 static const char iperf_char = 0x77;  // 01110111
 static int g_stream_id = 1;
@@ -147,6 +147,16 @@ IperfStream::IperfStream(IOContext& io, std::basic_ofstream<char>& log_stream, T
   // tcp
   if (config_.protocol == 10) {
     bats_config.frame_type = BATSFrameType::BATS_HEADER_MIN;
+  }
+
+  bool disabled_cc = false;
+  if (const char* value = std::getenv("ENV_BATS_IPERF_DISABLE_CC")) {
+    disabled_cc = std::atoi(value);
+  }
+
+  if (disabled_cc) {
+    bats_config.congestion_control = BATSCongestionControl::None;
+    spdlog::warn("[IperfStream] Test stream {} disabled the cc", this->Id());
   }
 
   // to start new connection with `connector_`
@@ -473,6 +483,7 @@ bool IperfStream::ValidateReceivedData(const octet* data, int length) {
     spdlog::error(
         "[IperfStream] Test stream {} received data corruption at the end of data, length {}; char diff {:x} vs {:x}",
         this->Id(), length, data[length - 1], iperf_char);
+    spdlog::error("[IperfStream] received tail: {:n}", spdlog::to_hex(data + length - 16, data + length));
     return false;
   }
 
@@ -482,6 +493,8 @@ bool IperfStream::ValidateReceivedData(const octet* data, int length) {
       spdlog::error(
           "[IperfStream] Test stream {} received data corruption at the mid of data, length {}; char diff {:x} vs {:x}",
           this->Id(), length, data[length - 1 - link_mtu], iperf_char);
+      spdlog::error("[IperfStream] received mid: {:n}",
+                    spdlog::to_hex(data + length - 16 - link_mtu, data + length - link_mtu));
       return false;
     }
   }
@@ -507,7 +520,7 @@ bool IperfStream::UpdateReceived(const octet* data, int length) {
                   this->Id(), seq, test_header->magic, bats_iperf_magic_code);
     // indicate corruption in data
     spdlog::error("[IperfStream] received header: {:n}", spdlog::to_hex(data, data + sizeof(iperf_test_header) + 8));
-    exit(EXIT_FAILURE);
+    return false;
   }
 
   recv_seq_recorder_.Record(seq);
@@ -669,7 +682,7 @@ void IperfStream::StartSend() {
   state_ = StreamState::STREAM_START;
   sending_thread_ = std::thread([this]() {
     if (IsConnected() == false) {
-      spdlog::info("[IperfStream] Data stream is not connected, stop sending.");
+      spdlog::info("[IperfStream] Test stream {} is not connected, stop sending.", this->Id());
       this->Stop();
       return;
     }

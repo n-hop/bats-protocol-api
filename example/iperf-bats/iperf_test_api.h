@@ -45,7 +45,7 @@ struct iperf_control_data {
   uint32_t param2;  // low bits of file length
   uint32_t param3;
   // void *data // of streams;
-};
+} __attribute__((__packed__));
 
 class IIperfTest {
  public:

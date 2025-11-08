@@ -131,6 +131,8 @@ class IperfTest : public IIperfTest {
   void HandleTestParameters(const struct iperf_control_data* control_header);
   /// @brief Check whether expected interval data is received.
   void CheckStreamIntervalReceive();
+  bool NeedReadySignal();
+  bool LoadEnvs();
 
  private:
   std::mutex streams_mutex_;
@@ -139,6 +141,7 @@ class IperfTest : public IIperfTest {
   BatsProtocolPtr ctrl_chn_connector_ = nullptr;
   std::list<IperfStreamPtr> test_streams_;
   int passed_ticks_ = 0;
+  bool user_disabled_cc_ = false;
 };
 
 using IperfTestPtr = std::shared_ptr<IperfTest>;

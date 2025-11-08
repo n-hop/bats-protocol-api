@@ -18,7 +18,7 @@ const uint32_t BATS_IPERF_MAJOR_VERSION = 1;
 const uint32_t BATS_IPERF_MINOR_VERSION = 0;
 const char BATS_IPERF_BUILD_TYPE[] = {"Release \n"};
 const char BATS_IPERF_VERSION_STR[] = {
-    "BATS Iperf version: v1.0(2a67e3d)  Build "
+    "BATS Iperf version: v1.0(6e6d482)  Build "
     "date: " __DATE__ " " __TIME__};
 
 const char BATS_IPERF_COMPILER_INFO_STR[] = {"gcc11 "};

@@ -30,14 +30,24 @@ error "Missing the <filesystem> header."
 #include "src/include/time.h"
 
 IperfTest::IperfTest(IOContext& io, std::basic_ofstream<char>& log_stream, uint64_t id, const TestConfig& config)
-    : IIperfTest(io, log_stream, id, config) {}
+    : IIperfTest(io, log_stream, id, config) {
+  LoadEnvs();
+}
 
 IperfTest::IperfTest(IOContext& io, std::basic_ofstream<char>& log_stream, const TestConfig& config)
     : IIperfTest(io, log_stream, config) {
+  LoadEnvs();
   spdlog::info("[IperfTest] Test is created with id: {}", test_id_);
 }
 
 IperfTest::~IperfTest() {}
+
+bool IperfTest::LoadEnvs() {
+  if (const char* value = std::getenv("ENV_BATS_IPERF_DISABLE_CC")) {
+    user_disabled_cc_ = std::atoi(value);
+  }
+  return true;
+}
 
 bool IperfTest::Start() {
   // 0. check existence of bats_default_key_file
@@ -54,8 +64,17 @@ bool IperfTest::Start() {
   BatsConfiguration bats_config;
   bats_config.connection_timeout = 1000 * 1000;
   bats_config.frame_type = BATSFrameType::BATS_HEADER_MIN;
-  // default to TCP
-  bats_config.transport_mode = static_cast<BATSTransMode>(10);
+  if (!user_disabled_cc_) {
+    // default to TCP
+    bats_config.transport_mode = static_cast<BATSTransMode>(10);
+  } else {
+    // when `ENV_BATS_IPERF_DISABLE_CC` is set, we assume that it's a test on the high-loss(50%) network path.
+    bats_config.transport_mode = BATSTransMode::BRTP;
+    bats_config.frame_type = BATSFrameType::BATS_HEADER_V1;
+    bats_config.congestion_control = BATSCongestionControl::None;
+    spdlog::info("[IperfTest] User disabled the congestion control via ENV_BATS_IPERF_DISABLE_CC.");
+  }
+
   bats_config.cert_file = bats_default_cert_file;
   bats_config.key_file = bats_default_key_file;
   bats_config.remote_addr = test_config_.peer_host;
@@ -105,6 +124,11 @@ void IperfTest::OnSentFinished() {
   SendTestSummary();
 }
 
+bool IperfTest::NeedReadySignal() {
+  // UDP simulates the accept with the first packet.
+  return test_config_.protocol != 11 && !user_disabled_cc_;
+}
+
 void IperfTest::DataListenCallback(const IBatsConnPtr& data_conn, const BatsListenEvent& event, void* user) {
   switch (event) {
     case BatsListenEvent::BATS_LISTEN_NEW_CONNECTION:
@@ -120,9 +144,8 @@ void IperfTest::DataListenCallback(const IBatsConnPtr& data_conn, const BatsList
           std::scoped_lock lock(streams_mutex_);
           test_streams_.push_back(data_stream);
         }
-        if (test_config_.protocol != 11 && test_config_.num_streams == test_streams_.size()) {
-          // UDP simulates the accept with the first packet.
-          spdlog::info("[IperfTest] All data streams are connected.");
+        if (NeedReadySignal() && test_config_.num_streams == test_streams_.size()) {
+          spdlog::info("[IperfTest] All data streams are connected. num {}", test_streams_.size());
           SendTestReady();
         }
       }
@@ -224,8 +247,8 @@ void IperfTest::HandleAckMessage([[maybe_unused]] const struct iperf_control_dat
     for (int i = 0; i < test_config_.num_streams; ++i) {
       auto stream = std::make_shared<IperfStream>(io_, log_stream_, test_config_);
       stream->StartConnect();
-      if (test_config_.protocol == 11) {
-        // no need to wait when it's UDP.
+      if (!NeedReadySignal()) {
+        // no need to wait when it's UDP or BRTP without CC.
         stream->StartSend();
       }
       test_streams_.push_back(stream);
@@ -304,6 +327,12 @@ void IperfTest::HandleTestParameters(const struct iperf_control_data* control_he
   if (received_test_config.protocol == 10) {
     bats_config.frame_type = BATSFrameType::BATS_HEADER_MIN;
   }
+
+  if (user_disabled_cc_) {
+    bats_config.congestion_control = BATSCongestionControl::None;
+    spdlog::warn("[IperfStream] Test stream {} disabled the cc", this->Id());
+  }
+
   data_chn_listener_ = std::make_shared<BatsProtocol>(io_, bats_config);
   received_test_config.resolution = test_config_.resolution;
   received_test_config.is_debug_mode = test_config_.is_debug_mode;

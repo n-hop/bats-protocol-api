@@ -116,8 +116,22 @@ TestRole IperfBatsApi::InitFromArgs(int argc, char* argv[]) {
   BatsConfiguration bats_config;
   bats_config.connection_timeout = 1000 * 1000;
   bats_config.frame_type = BATSFrameType::BATS_HEADER_MIN;
-  // default to TCP
-  bats_config.transport_mode = static_cast<BATSTransMode>(10);
+
+  bool user_disabled_cc = false;
+  if (const char* value = std::getenv("ENV_BATS_IPERF_DISABLE_CC")) {
+    user_disabled_cc = std::atoi(value);
+  }
+  if (!user_disabled_cc) {
+    // default to TCP
+    bats_config.transport_mode = static_cast<BATSTransMode>(10);
+  } else {
+    // when `ENV_BATS_IPERF_DISABLE_CC` is set, we assume that it's a test on the high-loss(50%) network path.
+    bats_config.transport_mode = BATSTransMode::BRTP;
+    bats_config.frame_type = BATSFrameType::BATS_HEADER_V1;
+    bats_config.congestion_control = BATSCongestionControl::None;
+    spdlog::info("[IperfBatsApi] User disabled the congestion control via ENV_BATS_IPERF_DISABLE_CC.");
+  }
+
   bats_config.cert_file = bats_default_cert_file;
   bats_config.key_file = bats_default_key_file;
 
@@ -553,7 +567,7 @@ void IperfBatsApi::EnterSenderIntervalLoop() {
   }
 
   // 6. ROLE_SENDER wait for TEST_DONE signal.
-  int max_wait_time = 15;  // 3 seconds
+  int max_wait_time = 20;  // 4 seconds
   while (max_wait_time > 0) {
     if (stop_signal_value == SIGINT) {
       break;

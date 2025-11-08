@@ -79,3 +79,20 @@ In this case, bats_iperf client has the new option `-P 5` to create 5 parallel s
 
 ![alt text](./imgs/iperf-file-trans-case4.png)
 ![alt text](./imgs/iperf-file-trans-case4-1.png)
+
+### Case 5 (TODO):
+
+Multiple files, Multiple streams, multiple available paths.
+
+```bash
+# Server side `Host 1` which has two adapters eth0 and eth1
+./bin/bats_iperf -s -I eth0 -p 5201
+./bin/bats_iperf -s -I eth1 -p 5201
+
+# Client side
+./bin/bats_iperf -c 10.53.1.101 10.53.1.102 -m 1 -p 5201 -f 2G 100M 1M 100K 1K 100B
+
+```
+
+In this case, bats_iperf client will create 2 bats connections to `Host 1`'s eth0 and eth1 respectively. And those 2 connections compete to transfer 3 files to `Host 1`(The connection which is free will transfer the next file.).
+

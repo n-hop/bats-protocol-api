@@ -13,7 +13,6 @@ configure_file(
   ${CMAKE_CURRENT_SOURCE_DIR}/iperf_version.h.in
   ${CMAKE_CURRENT_SOURCE_DIR}/iperf_version.h
 )
-add_definitions(-DDATA_COMPRESSION_ENABLED)
 
 include(FetchContent)
 include(ExternalProject)

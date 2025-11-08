@@ -116,7 +116,9 @@ class TestConfig {
     to_buffer[0] = static_cast<uint8_t>(protocol);
     // is reverse enabled
     to_buffer[1] = static_cast<uint8_t>(is_reverse_enabled ? 1 : 0);
-    to_buffer += 2;
+    // num. of streams
+    to_buffer[2] = static_cast<uint8_t>(num_streams);
+    to_buffer += 4;
 
     // port
     *reinterpret_cast<uint16_t*>(to_buffer) = port;
@@ -135,8 +137,9 @@ class TestConfig {
 
     protocol = static_cast<int>(from_buffer[0]);
     is_reverse_enabled = (from_buffer[1] != 0);
+    num_streams = static_cast<int>(from_buffer[2]);
 
-    from_buffer += 2;
+    from_buffer += 4;
     port = *reinterpret_cast<const uint16_t*>(from_buffer);
   }
 
